@@ -117,6 +117,7 @@ public:
 	bool Init() override;
 
 	vec3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEVec3dValuator* copy() override;
 
@@ -135,6 +136,7 @@ public:
 	bool Init() override;
 
 	vec3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEVec3dValuator* copy() override;
 
@@ -155,6 +157,7 @@ public:
 	bool Init() override;
 
 	vec3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEVec3dValuator* copy() override;
 

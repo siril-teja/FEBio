@@ -83,6 +83,16 @@ mat3d FEMaterial::GetLocalCS(const FEMaterialPoint& mp)
 }
 
 //-----------------------------------------------------------------------------
+bool FEMaterial::LocalCSIsReferenceInvariant()
+{
+	// mirrors GetLocalCS: the root of the chain uses the material point's own m_Q, which
+	// is assigned once at domain initialization
+	if (m_Q && (m_Q->isReferenceInvariant() == false)) return false;
+	FEMaterial* parent = dynamic_cast<FEMaterial*>(GetParent());
+	return (parent ? parent->LocalCSIsReferenceInvariant() : true);
+}
+
+//-----------------------------------------------------------------------------
 // set the (local) material axis valuator
 void FEMaterial::SetMaterialAxis(FEMat3dValuator* val)
 {
