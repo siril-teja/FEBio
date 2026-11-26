@@ -14,12 +14,16 @@
 
 use crate::symbolic::Symbolic;
 use faer::dyn_stack::{MemBuffer, MemStack};
-use faer::linalg::cholesky::ldlt::factor::{cholesky_in_place, cholesky_in_place_scratch, LdltParams, LdltRegularization};
+use faer::linalg::cholesky::ldlt::factor::{
+    cholesky_in_place, cholesky_in_place_scratch, LdltParams, LdltRegularization,
+};
 use faer::linalg::matmul::matmul;
 use faer::linalg::matmul::triangular::{matmul as tri_matmul, BlockStructure};
-use faer::linalg::triangular_solve::{solve_unit_lower_triangular_in_place, solve_unit_upper_triangular_in_place};
-use faer::{Accum, MatMut, MatRef, Par, Spec};
+use faer::linalg::triangular_solve::{
+    solve_unit_lower_triangular_in_place, solve_unit_upper_triangular_in_place,
+};
 use faer::reborrow::*;
+use faer::{Accum, MatMut, MatRef, Par, Spec};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicUsize, Ordering as AO};
 
@@ -91,7 +95,11 @@ pub fn schedule(sym: &Symbolic, nthreads: usize) -> (Vec<usize>, Vec<usize>) {
         set.sort_by(|a, b| w[*b].partial_cmp(&w[*a]).unwrap());
         let mut bins = vec![0.0f64; nthreads];
         for &r in &set {
-            let (imin, _) = bins.iter().enumerate().fold((0, f64::MAX), |acc, (i, &v)| if v < acc.1 { (i, v) } else { acc });
+            let (imin, _) =
+                bins.iter().enumerate().fold(
+                    (0, f64::MAX),
+                    |acc, (i, &v)| if v < acc.1 { (i, v) } else { acc },
+                );
             bins[imin] += w[r];
         }
         let maxb = bins.iter().cloned().fold(0.0, f64::max);
@@ -134,7 +142,13 @@ fn alloc_uninit_huge(len: usize) -> Vec<f64> {
     v
 }
 
-pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<Numeric>, sched: &(Vec<usize>, Vec<usize>)) -> Result<Numeric, String> {
+pub fn factor(
+    sym: &Symbolic,
+    avals: &[f64],
+    opt: &FactorOptions,
+    reuse: Option<Numeric>,
+    sched: &(Vec<usize>, Vec<usize>),
+) -> Result<Numeric, String> {
     let n = sym.n;
     let len = sym.len_val();
     let (mut l, mut d) = match reuse {
@@ -142,13 +156,26 @@ pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<
         _ => (alloc_uninit_huge(len), vec![0.0f64; n]),
     };
     let amax = avals.iter().fold(0.0f64, |m, &v| m.max(v.abs()));
-    let eps = if amax > 0.0 { opt.pivot_eps * amax } else { opt.pivot_eps };
+    let eps = if amax > 0.0 {
+        opt.pivot_eps * amax
+    } else {
+        opt.pivot_eps
+    };
     let nperturbed = AtomicUsize::new(0);
     let err = std::sync::Mutex::new(None::<String>);
     let lp = SyncPtr(l.as_mut_ptr());
     let dp = SyncPtr(d.as_mut_ptr());
 
-    let ctx = Ctx { sym, avals, lp, dp, eps, opt, nperturbed: &nperturbed, err: &err };
+    let ctx = Ctx {
+        sym,
+        avals,
+        lp,
+        dp,
+        eps,
+        opt,
+        nperturbed: &nperturbed,
+        err: &err,
+    };
     let (subtrees, top) = (&sched.0, &sched.1);
     {
         use rayon::prelude::*;
@@ -158,7 +185,12 @@ pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<
             let t = std::time::Instant::now();
             ctx.subtree_seq(r);
             if profiling() {
-                eprintln!("  subtree {r} ({:.2e} flops) {:.3}s on {:?}", sym.subtree_flops[r], t.elapsed().as_secs_f64(), rayon::current_thread_index());
+                eprintln!(
+                    "  subtree {r} ({:.2e} flops) {:.3}s on {:?}",
+                    sym.subtree_flops[r],
+                    t.elapsed().as_secs_f64(),
+                    rayon::current_thread_index()
+                );
             }
         };
         subtrees.par_iter().with_max_len(1).for_each(|&r| timed(r));
@@ -173,7 +205,13 @@ pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<
             }
             let is_top = &is_top;
             fn rec(ctx: &Ctx, s: usize, is_top: &[bool]) {
-                let ch: Vec<usize> = ctx.sym.children(s).iter().copied().filter(|&c| is_top[c]).collect();
+                let ch: Vec<usize> = ctx
+                    .sym
+                    .children(s)
+                    .iter()
+                    .copied()
+                    .filter(|&c| is_top[c])
+                    .collect();
                 if ch.len() > 1 {
                     rayon::scope(|sc| {
                         for &c in &ch {
@@ -185,7 +223,11 @@ pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<
                 }
                 ctx.supernode(s, true);
             }
-            let roots: Vec<usize> = top.iter().copied().filter(|&s| sym.sn_parent[s] == usize::MAX || !is_top[sym.sn_parent[s]]).collect();
+            let roots: Vec<usize> = top
+                .iter()
+                .copied()
+                .filter(|&s| sym.sn_parent[s] == usize::MAX || !is_top[sym.sn_parent[s]])
+                .collect();
             rayon::scope(|sc| {
                 for &r in &roots {
                     let ctx = &ctx;
@@ -206,7 +248,11 @@ pub fn factor(sym: &Symbolic, avals: &[f64], opt: &FactorOptions, reuse: Option<
     if let Some(e) = err.into_inner().unwrap() {
         return Err(e);
     }
-    Ok(Numeric { l, d, n_perturbed: nperturbed.load(AO::Relaxed) })
+    Ok(Numeric {
+        l,
+        d,
+        n_perturbed: nperturbed.load(AO::Relaxed),
+    })
 }
 
 struct Ctx<'a> {
@@ -232,7 +278,16 @@ impl<'a> Ctx<'a> {
 
     /// apply all descendant updates to columns [c0, c1) of supernode s
     #[allow(clippy::too_many_arguments)]
-    fn apply_updates(&self, s: usize, c0: usize, c1: usize, map: &[u32], t: &mut Vec<f64>, cbuf: &mut Vec<f64>, par: Par) {
+    fn apply_updates(
+        &self,
+        s: usize,
+        c0: usize,
+        c1: usize,
+        map: &[u32],
+        t: &mut Vec<f64>,
+        cbuf: &mut Vec<f64>,
+        par: Par,
+    ) {
         let sym = self.sym;
         let b = sym.sn_begin[s];
         let k = sym.k(s);
@@ -276,9 +331,26 @@ impl<'a> Ctx<'a> {
             {
                 let mut cm = MatMut::from_column_major_slice_mut(cbuf, len2, len1);
                 let (c_top, c_bot) = cm.rb_mut().split_at_row_mut(len1);
-                tri_matmul(c_top, BlockStructure::TriangularLower, Accum::Replace, ld1, BlockStructure::Rectangular, tm.transpose(), BlockStructure::Rectangular, 1.0, par);
+                tri_matmul(
+                    c_top,
+                    BlockStructure::TriangularLower,
+                    Accum::Replace,
+                    ld1,
+                    BlockStructure::Rectangular,
+                    tm.transpose(),
+                    BlockStructure::Rectangular,
+                    1.0,
+                    par,
+                );
                 if len2 > len1 {
-                    matmul(c_bot, Accum::Replace, ld2.subrows(len1, len2 - len1), tm.transpose(), 1.0, par);
+                    matmul(
+                        c_bot,
+                        Accum::Replace,
+                        ld2.subrows(len1, len2 - len1),
+                        tm.transpose(),
+                        1.0,
+                        par,
+                    );
                 }
             }
             // scatter-subtract into the panel of s
@@ -301,7 +373,14 @@ impl<'a> Ctx<'a> {
         if profiling() {
             let el = t_start.elapsed().as_secs_f64();
             if el > 0.01 {
-                eprintln!("sn {s}: k={} m={} nupd={} sub_flops={:.2e} t={:.4}s", self.sym.k(s), self.sym.m(s), self.sym.updates(s).len(), self.sym.subtree_flops[s], el);
+                eprintln!(
+                    "sn {s}: k={} m={} nupd={} sub_flops={:.2e} t={:.4}s",
+                    self.sym.k(s),
+                    self.sym.m(s),
+                    self.sym.updates(s).len(),
+                    self.sym.subtree_flops[s],
+                    el
+                );
             }
         }
     }
@@ -403,7 +482,8 @@ impl<'a> Ctx<'a> {
             match cholesky_in_place(l11, reg, par, MemStack::new(&mut mem), params) {
                 Ok(_) => {}
                 Err(e) => {
-                    *self.err.lock().unwrap() = Some(format!("LDLT failed in supernode {s}: {e:?}"));
+                    *self.err.lock().unwrap() =
+                        Some(format!("LDLT failed in supernode {s}: {e:?}"));
                     return;
                 }
             }
@@ -443,7 +523,14 @@ impl<'a> Ctx<'a> {
                 uflops += len1 * len2 * kd as f64;
                 skd += len1 * len2;
             }
-            eprintln!("   sn {s}: upd {:.4}s ({:.2e} flop, {:.1} GF/s, avg kd {:.1}), dense {:.4}s", t_upd, uflops, uflops / t_upd * 1e-9, uflops / skd, t_in.elapsed().as_secs_f64() - t_upd);
+            eprintln!(
+                "   sn {s}: upd {:.4}s ({:.2e} flop, {:.1} GF/s, avg kd {:.1}), dense {:.4}s",
+                t_upd,
+                uflops,
+                uflops / t_upd * 1e-9,
+                uflops / skd,
+                t_in.elapsed().as_secs_f64() - t_upd
+            );
         }
     }
 }
@@ -512,7 +599,14 @@ pub fn solve_permuted(sym: &Symbolic, num: &Numeric, x: &mut [f64]) {
 /// backward (L^T x = y): top of the tree first (parallel over columns of large supernodes),
 ///          then the independent subtrees in parallel; each supernode only writes its own
 ///          entries and reads ancestors, which are final.
-pub fn solve_permuted_par(sym: &Symbolic, num: &Numeric, x: &mut [f64], subtrees: &[usize], top: &[usize], nthreads: usize) {
+pub fn solve_permuted_par(
+    sym: &Symbolic,
+    num: &Numeric,
+    x: &mut [f64],
+    subtrees: &[usize],
+    top: &[usize],
+    nthreads: usize,
+) {
     use rayon::prelude::*;
     if nthreads <= 1 || subtrees.len() <= 1 {
         return solve_permuted(sym, num, x);
@@ -549,16 +643,22 @@ pub fn solve_permuted_par(sym: &Symbolic, num: &Numeric, x: &mut [f64], subtrees
         };
         let acc = if par && upds.len() >= 32 {
             upds.par_iter()
-                .fold(|| vec![0.0f64; k], |mut acc, u| {
-                    gather(u, &mut acc);
-                    acc
-                })
-                .reduce(|| vec![0.0f64; k], |mut a, bv| {
-                    for (p, q) in a.iter_mut().zip(&bv) {
-                        *p += q;
-                    }
-                    a
-                })
+                .fold(
+                    || vec![0.0f64; k],
+                    |mut acc, u| {
+                        gather(u, &mut acc);
+                        acc
+                    },
+                )
+                .reduce(
+                    || vec![0.0f64; k],
+                    |mut a, bv| {
+                        for (p, q) in a.iter_mut().zip(&bv) {
+                            *p += q;
+                        }
+                        a
+                    },
+                )
         } else {
             let mut acc = vec![0.0f64; k];
             for u in upds {
@@ -596,7 +696,9 @@ pub fn solve_permuted_par(sym: &Symbolic, num: &Numeric, x: &mut [f64], subtrees
                 acc
             };
             if par && (m - k) * k >= 200_000 {
-                v.par_iter_mut().enumerate().for_each(|(c, out)| *out = dot(c));
+                v.par_iter_mut()
+                    .enumerate()
+                    .for_each(|(c, out)| *out = dot(c));
             } else {
                 for c in 0..k {
                     v[c] = dot(c);
