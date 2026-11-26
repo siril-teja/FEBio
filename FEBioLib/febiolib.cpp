@@ -31,6 +31,7 @@ SOFTWARE.*/
 #include "NumCore/NumCore.h"
 #include "FEAMR/FEAMR.h"
 #include "FEBioMech/FEBioMechModule.h"
+#include "FEBioMix/FEBioMix.h"
 #include "febio.h"
 #include "plugin.h"
 #include "FEBioStdSolver.h"
@@ -57,7 +58,7 @@ void InitLibrary()
 	FEAMR::InitModule();
 	NumCore::InitModule();
 	FEBioMech::InitModule();
-
+	FEBioMix::InitModule();
 }
 
 //-----------------------------------------------------------------------------

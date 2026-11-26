@@ -12,7 +12,7 @@ PHASES = ["Total elapsed time", "time in linear solver", "model update", "evalua
           "evaluating residual", "reforming stiffness", "serialization", "IO-time (plot, dmp, data)"]
 MODELS = [
     ("spine_n40_flex", "spine/gen_fsu.py", ["--mode", "flex", "--n", "40", "--nz", "12"]),
-    ("spine_fric_n24_ar", "spine/gen_fsu.py", ["--mode", "ar", "--n", "24", "--nz", "8", "--friction", "0.1"]),
+    ("spine_bp_n24_flex", "spine/gen_fsu.py", ["--mode", "flex", "--n", "24", "--nz", "8", "--biphasic"]),
     ("hex20_n14_mr_newton", "gen_model.py", ["--n", "14", "--elem", "hex20", "--mat", "mr", "--newton"]),
     ("hex8_n20_newton", "gen_model.py", ["--n", "20", "--newton"]),
 ]

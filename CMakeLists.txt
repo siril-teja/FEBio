@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(FEBio)
-set(FEBIO_LIBS FEBioLib FEBioMech FECore NumCore FEAMR FEBioPlot FEBioXML)
+set(FEBIO_LIBS FEBioLib FEBioMech FEBioMix FECore NumCore FEAMR FEBioPlot FEBioXML)
 set(STATIC_FEBIO_LIBS febcode)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -195,6 +195,7 @@ if(WIN32)
     target_compile_options(febio4 PRIVATE /openmp)
     target_compile_options(febiolib PRIVATE /openmp)
     target_compile_options(febiomech PRIVATE /openmp)
+    target_compile_options(febiomix PRIVATE /openmp)
     target_compile_options(fecore PRIVATE /openmp)
     target_compile_options(feamr PRIVATE /openmp)
     target_compile_options(febioplot PRIVATE /openmp)
@@ -428,7 +429,8 @@ target_link_libraries(febioplot PRIVATE fecore)
 target_link_libraries(feamr PRIVATE fecore)
 target_link_libraries(febiomech PRIVATE fecore feamr)
 
-target_link_libraries(febiolib PRIVATE febioplot febiomech febioxml numcore feamr fecore)
+target_link_libraries(febiomix PRIVATE febiomech fecore)
+target_link_libraries(febiolib PRIVATE febioplot febiomech febiomix febioxml numcore feamr fecore)
 
 # pull febcode into FECore
 target_link_libraries(fecore PRIVATE febcode)
@@ -445,6 +447,7 @@ else()
         target_link_libraries(numcore PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febioxml PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febioplot PRIVATE -static-libstdc++ -static-libgcc)
+        target_link_libraries(febiomix PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febiomech PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(feamr PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febiolib PRIVATE -static-libstdc++ -static-libgcc stdc++fs)
@@ -463,14 +466,14 @@ endif()
 
 #### Set up installation #####
 install(TARGETS febio4 numcore febioxml febioplot
-    febiomech feamr fecore febiolib
+    febiomech febiomix feamr fecore febiolib
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     )
 
 install(DIRECTORY 
-    FEBio NumCore FECore FEAMR FEBioLib FEBioMech FEBioPlot FEBioXML
+    FEBio NumCore FECore FEAMR FEBioLib FEBioMech FEBioMix FEBioPlot FEBioXML
     DESTINATION include
     FILES_MATCHING PATTERN "*.h*"
     )

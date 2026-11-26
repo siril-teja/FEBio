@@ -11,6 +11,7 @@ cp $FEBIO_REPO/FEBioConfig.cmake ${TARGET_DIR}/lib/cmake/FEBio
 sdkDirs=(
     FECore
     FEBioMech
+    FEBioMix
     FEBioPlot
     FEBioXML
     FEBioLib
@@ -20,6 +21,7 @@ sdkDirs=(
 sdkLibs=(
     libfecore.so
     libfebiomech.so
+    libfebiomix.so
     libfebioplot.so
     libfebioxml.so
     libfebiolib.so

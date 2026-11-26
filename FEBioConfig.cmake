@@ -21,6 +21,7 @@ cmake_minimum_required(VERSION 3.15)
 set(_FEBIO_LIBS
     FECore
     FEBioMech
+    FEBioMix
     FEBioPlot
     FEBioXML
     FEBioLib
