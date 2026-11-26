@@ -67,6 +67,7 @@ def main():
     ap.add_argument("--json", default="ci_regression.json")
     ap.add_argument("--md", default="ci_regression.md")
     a = ap.parse_args()
+    a.febio = os.path.abspath(a.febio)  # runs use the model directory as cwd
     os.makedirs(a.workdir, exist_ok=True)
     rows, failed = [], []
     for name, gen, args, edit in MODELS:
