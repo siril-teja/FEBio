@@ -136,6 +136,40 @@ The smallest symmetric speed-up is `fsu_n40_ar` at 4 threads (1.08×). Axial rot
 
 ---
 
+# Published spine models: Finley et al. (2018)
+
+These are the subject-specific FEBio lumbar models of Finley et al. (2018, CMBBE 21(6):444–452), stored in `models/finley2018/`.
+- **Load case:** each model carries a pressure preload and then a 7.5 N·m pure moment over 100 load steps.
+- **Format conversion:** the FEBio 2.5 files are converted for FEBio 4 by `rust/bench/finley/convert_feb25.py`. The converter makes no value changes and produces identical input for every configuration; see `models/finley2018/README.md`.
+- **Driver:** `rust/bench/finley/run_finley.py`; raw data in `rust/bench/results/finley_l45.json`.
+- **Machine:** 4 threads, the same 4-core VM as above. Run-to-run noise on this VM is about ±10%.
+
+| config | executable | linear solver | mode |
+|---|---|---|---|
+| native | upstream FEBio 4.13 (`552138d`) | MKL PARDISO | upstream (non-deterministic) |
+| Rust | FEBio-Rust (0.4.9 + #17, i.e. 0.4.10) | Rust | deterministic (default) |
+| Rust + PARDISO | FEBio-Rust | MKL PARDISO (reproducible mode) | deterministic (default) |
+
+## L4–L5 functional spinal units
+
+| model | equations | native | Rust | Rust + PARDISO | Rust vs native | iterations / reformations | rotation of the loaded vertebra (°) |
+|---|---:|---:|---:|---:|---:|---|---|
+| 59F L4–L5 hybrid | 49,971 | 126.3 s (lin. 87.6) | **120.3 s** (lin. 64.1) | 152.7 s | **1.05×** | 378 / 100, all three | 4.0433, all three |
+| 49F L4–L5 hex | 110,508 | 288.0 s (lin. 223.3) | **214.0 s** (lin. 134.6) | 342.4 s | **1.35×** | 368 / 100, all three | 4.0414, all three |
+| 49F L4–L5 hybrid | 112,764 | 67.8 s (lin. 50.2) | 73.9 s (lin. 46.3) | 83.1 s | 0.92× | 97 / 15, all three | 5.0045, all three |
+
+The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU refinement (#17); before 0.4.10 it took 101.4 s.
+
+- **Accuracy:**
+  - All three configurations take the same number of equilibrium iterations and reformations.
+  - The final rigid-body rotations agree to the 12 digits FEBio prints.
+  - The authors' FEBio 2.x logs report 378 iterations for 59F and 365 for 49F hex.
+- **Linear solver:** the Rust solver is 8–40% faster than native PARDISO. FEBio-Rust's own PARDISO runs are slower than native, because MKL's reproducible (CNR) mode costs about 30%.
+- **Remaining gap:**
+  - **Stiffness and residual evaluation:** about 2× slower than native. FEBio-Rust adds element contributions in a fixed order, and native uses atomics (OPEN_ITEMS P13, ROADMAP 3.11).
+  - **Serial loops:** contact and spring loops still run serially in deterministic mode (ROADMAP 3.4/3.5).
+  - These costs dominate on BFGS-heavy runs with few reformations (49F hybrid).
+
 # Determinism
 
 **Sources of run-to-run variation found** (verified by repeated runs and byte comparison of the output):

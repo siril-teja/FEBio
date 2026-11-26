@@ -65,6 +65,7 @@ How the deterministic mode works:
 | `rust/febio_rs_solver/` | Rust solver crate (C ABI, tests) |
 | `NumCore/RustSolver.*` | FEBio wrapper for the Rust solver |
 | `rust/bench/` | benchmark models, regression and benchmark scripts |
+| `models/` | published spine models (Finley et al. 2018) used for benchmarks |
 | everything else | FEBio (upstream) |
 
 ## Contributing

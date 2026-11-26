@@ -12,6 +12,18 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.5.0] - 2026-11-26
+
+### Added
+- **Models:** the published Finley et al. (2018) FEBio lumbar spine models are now in `models/finley2018/`, moved from the repository root, with citation, license and conversion notes.
+- **`rust/bench/finley/convert_feb25.py`:** makes the FEBio 2.5 files readable by FEBio 4 with no value changes:
+  - fiber angles become fiber generators;
+  - material axes move from fiber components to their mixture;
+  - the old `sliding-elastic` contact name is updated;
+  - `sliding2` models get the biphasic module scope, keeping the symmetric stiffness of FEBio 2.x.
+- **`rust/bench/finley/run_finley.py`:** benchmark driver.
+- **`rust/BENCHMARKS.md`:** L4–L5 results. FEBio-Rust matches native FEBio 4.13's iterations and rotations exactly and is 0.92–1.35× its speed at 4 threads.
+
 ## [0.4.10] - 2026-11-26
 
 ### Performance
