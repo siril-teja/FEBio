@@ -12,6 +12,11 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.7] - 2026-11-26
+
+### CI
+- PR policy checks the pull request's current title and description, read from the GitHub API after a short wait, instead of the event snapshot. A newer run for the same PR cancels the older one. A description edited right after opening therefore no longer leaves a stale failed check. The rules themselves are unchanged.
+
 ## [0.4.6] - 2026-11-26
 
 ### Fixed
