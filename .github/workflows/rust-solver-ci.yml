@@ -1,12 +1,12 @@
 name: Rust solver CI
 
 # Gate for the Rust linear solver (rust/febio_rs_solver, NumCore/RustSolver).
-# Runs on every push to feature branches and on pull requests into develop.
+# Runs on pull requests into main (the gated integration branch) and on pushes.
 on:
   push:
-    branches: ['ccr-**', 'feature/**', 'develop']
+    branches: ['main', 'develop', 'feature/**', 'ccr-**']
   pull_request:
-    branches: ['develop']
+    branches: ['main', 'develop']
   workflow_dispatch:
 
 permissions:
