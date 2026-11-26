@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FEBiphasicSolidDomain.h"
 #include "FECore/FEMesh.h"
 #include "FECore/log.h"
@@ -294,32 +295,29 @@ void FEBiphasicSolidDomain::InternalForces(FEGlobalVector& R)
 	int degree_p = dofs.GetVariableInterpolationOrder(m_varP);
 
 	int NE = (int)m_Elem.size();
-	#pragma omp parallel for shared (NE)
-	for (int i=0; i<NE; ++i)
-	{
-		// element force vector
-		vector<double> fe;
-		vector<int> lm;
-		
-		// get the element
-		FESolidElement& el = m_Elem[i];
+	// element vectors are computed in parallel and assembled in element order (deterministic)
+	struct Item { vector<double> fe; vector<int> lm; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int i, Item& it) {
+			// get the element
+			FESolidElement& el = m_Elem[i];
 
-		int nel_d = el.ShapeFunctions(degree_d);
-		int nel_p = el.ShapeFunctions(degree_p);
+			int nel_d = el.ShapeFunctions(degree_d);
 
-		// get the element force vector and initialize it to zero
-		int ndof = 4*nel_d;
-		fe.assign(ndof, 0);
+			// get the element force vector and initialize it to zero
+			int ndof = 4*nel_d;
+			it.fe.assign(ndof, 0);
 
-		// calculate internal force vector
-		ElementInternalForce(el, fe);
+			// calculate internal force vector
+			ElementInternalForce(el, it.fe);
 
-		// get the element's LM vector
-		UnpackLM(el, lm);
-
-		// assemble element 'fe'-vector into global R vector
-		R.Assemble(el.m_node, lm, fe);
-	}
+			// get the element's LM vector
+			UnpackLM(el, it.lm);
+		},
+		[&](int i, Item& it) {
+			// assemble element 'fe'-vector into global R vector
+			R.Assemble(m_Elem[i].m_node, it.lm, it.fe);
+		});
 }
 
 //-----------------------------------------------------------------------------
@@ -538,32 +536,30 @@ void FEBiphasicSolidDomain::StiffnessMatrix(FELinearSystem& LS, bool bsymm)
 {
 	// repeat over all solid elements
 	int NE = (int)m_Elem.size();
-    
-    #pragma omp parallel for shared(NE)
-	for (int iel=0; iel<NE; ++iel)
-	{
-		FESolidElement& el = m_Elem[iel];
+	// element matrices are computed in parallel and assembled in element order (deterministic)
+	struct Item { FEElementMatrix ke; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int iel, Item& it) {
+			FESolidElement& el = m_Elem[iel];
 
-		// element stiffness matrix
-		FEElementMatrix ke(el);
-		int ndof = el.Nodes()*4;
-		ke.resize(ndof, ndof);
-		
-		// calculate the element stiffness matrix
-		ElementBiphasicStiffness(el, ke, bsymm);
-		
-		// TODO: the problem here is that the LM array that is returned by the UnpackLM
-		// function does not give the equation numbers in the right order. For this reason we
-		// have to create a new lm array and place the equation numbers in the right order.
-		// What we really ought to do is fix the UnpackLM function so that it returns
-		// the LM vector in the right order for poroelastic elements.
-		vector<int> lm;
-		UnpackLM(el, lm);
-		ke.SetIndices(lm);
+			// element stiffness matrix
+			it.ke = FEElementMatrix(el);
+			FEElementMatrix& ke = it.ke;
+			int ndof = el.Nodes()*4;
+			ke.resize(ndof, ndof);
 
-        // assemble element matrix in global stiffness matrix
-		LS.Assemble(ke);
-	}
+			// calculate the element stiffness matrix
+			ElementBiphasicStiffness(el, ke, bsymm);
+
+			// (the LM vector is reordered by UnpackLM for poroelastic elements)
+			vector<int> lm;
+			UnpackLM(el, lm);
+			ke.SetIndices(lm);
+		},
+		[&](int iel, Item& it) {
+			// assemble element matrix in global stiffness matrix
+			LS.Assemble(it.ke);
+		}, 256);
 }
 
 //-----------------------------------------------------------------------------
@@ -571,32 +567,30 @@ void FEBiphasicSolidDomain::StiffnessMatrixSS(FELinearSystem& LS, bool bsymm)
 {
 	// repeat over all solid elements
 	int NE = (int)m_Elem.size();
+	// element matrices are computed in parallel and assembled in element order (deterministic)
+	struct Item { FEElementMatrix ke; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int iel, Item& it) {
+			FESolidElement& el = m_Elem[iel];
 
-	#pragma omp parallel for shared(NE)
-	for (int iel=0; iel<NE; ++iel)
-	{
-		FESolidElement& el = m_Elem[iel];
+			// element stiffness matrix
+			it.ke = FEElementMatrix(el);
+			FEElementMatrix& ke = it.ke;
+			int ndof = el.Nodes()*4;
+			ke.resize(ndof, ndof);
 
-		// element stiffness matrix
-		FEElementMatrix ke(el);
-		int ndof = el.Nodes()*4;
-		ke.resize(ndof, ndof);
-		
-		// calculate the element stiffness matrix
-		ElementBiphasicStiffnessSS(el, ke, bsymm);
-		
-		// TODO: the problem here is that the LM array that is returned by the UnpackLM
-		// function does not give the equation numbers in the right order. For this reason we
-		// have to create a new lm array and place the equation numbers in the right order.
-		// What we really ought to do is fix the UnpackLM function so that it returns
-		// the LM vector in the right order for poroelastic elements.
-		vector<int> lm;
-		UnpackLM(el, lm);
-		ke.SetIndices(lm);
+			// calculate the element stiffness matrix
+			ElementBiphasicStiffnessSS(el, ke, bsymm);
 
-		// assemble element matrix in global stiffness matrix
-		LS.Assemble(ke);
-	}
+			// (the LM vector is reordered by UnpackLM for poroelastic elements)
+			vector<int> lm;
+			UnpackLM(el, lm);
+			ke.SetIndices(lm);
+		},
+		[&](int iel, Item& it) {
+			// assemble element matrix in global stiffness matrix
+			LS.Assemble(it.ke);
+		}, 256);
 }
 
 //-----------------------------------------------------------------------------
@@ -919,7 +913,10 @@ void FEBiphasicSolidDomain::Update(const FETimeInfo& tp)
 {
 	bool berr = false;
 	int NE = (int) m_Elem.size();
-	#pragma omp parallel for shared(NE, berr)
+	// Each element only writes its own data, so the stress updates are order independent and
+	// run on all requested threads also in deterministic mode. Errors are logged in element order.
+	FECoreThreads::OrderedMessages errs;
+	#pragma omp parallel for shared(NE, berr) num_threads(FECoreThreads::RequestedThreads())
 	for (int i=0; i<NE; ++i)
 	{
 		try
@@ -928,13 +925,12 @@ void FEBiphasicSolidDomain::Update(const FETimeInfo& tp)
 		}
 		catch (NegativeJacobian e)
 		{
-			#pragma omp critical
-			{
-				berr = true;
-				if (e.DoOutput()) feLogError(e.what());
-			}
+			#pragma omp atomic write
+			berr = true;
+			if (e.DoOutput()) errs.add(i, e.what());
 		}
 	}
+	errs.flush([this](const std::string& msg) { feLogError(msg.c_str()); });
 
     if (berr) throw NegativeJacobianDetected();
 

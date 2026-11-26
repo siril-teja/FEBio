@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.2] - 2026-11-26
+
+### Performance
+- Deterministic parallel element loops for the solid, three-field and biphasic domains:
+  - material updates run on all threads;
+  - element matrices and vectors are computed in parallel and assembled in element order.
+  - −12 to −32% end to end; output byte-identical, also to a single-threaded run.
+
 ## [0.4.1] - 2026-11-26
 
 ### Performance
