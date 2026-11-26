@@ -25,6 +25,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 #pragma once
 #include "fecore_api.h"
+#include <vector>
+#include <map>
+#include <string>
 
 //! Thread configuration and run-to-run determinism.
 //!
@@ -51,4 +54,38 @@ namespace FECoreThreads {
 
 	//! Is deterministic mode on?
 	FECORE_API bool IsDeterministic();
+
+	//! Deterministic parallel element loop with ordered assembly.
+	//!
+	//! compute(i, item) runs in parallel (all requested threads, also in deterministic mode)
+	//! and must only write into its own item. assemble(i, item) is then called on the
+	//! calling thread strictly in index order. All floating-point accumulation into shared
+	//! data (global matrix, residual) therefore happens in exactly the order of a serial loop:
+	//! the result is bitwise identical to a single-threaded run, for any thread count.
+	template <class T, class Compute, class Assemble>
+	void ComputeThenAssembleInOrder(int n, Compute compute, Assemble assemble, int chunk = 1024)
+	{
+		const int nt = RequestedThreads();
+		std::vector<T> buf;
+		for (int c0 = 0; c0 < n; c0 += chunk)
+		{
+			const int c1 = (c0 + chunk < n ? c0 + chunk : n);
+			buf.resize(c1 - c0);
+			#pragma omp parallel for num_threads(nt) schedule(static)
+			for (int i = c0; i < c1; ++i) compute(i, buf[i - c0]);
+			for (int i = c0; i < c1; ++i) assemble(i, buf[i - c0]);
+		}
+	}
+
+	//! Collects error messages from a parallel loop and reports them in index order, so that
+	//! the log output does not depend on thread timing either.
+	class OrderedMessages
+	{
+	public:
+		void add(int i, const std::string& msg);	//!< thread safe
+		template <class F> void flush(F f) { for (auto& m : m_msg) f(m.second); m_msg.clear(); }
+		bool empty() const { return m_msg.empty(); }
+	private:
+		std::map<int, std::string> m_msg;
+	};
 }

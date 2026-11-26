@@ -47,7 +47,10 @@ For an MKL build (PARDISO), see `ci/rust/setup-mkl.sh` and [BUILD.md](BUILD.md).
 
 FEBio's element loops normally add contributions to the global matrix and vectors from several threads with atomic operations. The order of floating-point additions then varies from run to run, and so do the last bits of the results. FEBio-Rust removes that variation by default:
 
-- **FEBio's own loops** (assembly, residual, material updates) run on one thread in deterministic mode.
+- **FEBio's own loops:**
+  - material updates run on all threads, since each element only writes its own data;
+  - solid, three-field and biphasic assembly computes element contributions in parallel and adds them in element order;
+  - every other OpenMP loop runs on one thread.
 - **The Rust solver** uses all requested threads (`OMP_NUM_THREADS` or `nthreads`). Its arithmetic is fixed regardless of scheduling, so the solution is bitwise identical run to run *and* for any thread count.
 - **MKL PARDISO** runs in MKL's conditional-numerical-reproducibility mode (`MKL_CBWR_AUTO`), which makes it reproducible run to run for a fixed thread count.
 
@@ -56,7 +59,7 @@ FEBio's element loops normally add contributions to the global matrix and vector
 | deterministic (default) | — | byte-identical output on every run |
 | non-deterministic | `febio4 -nondeterministic …` or `FEBIO_DETERMINISTIC=0` | FEBio's parallel atomic assembly as upstream; last-bit differences between runs |
 
-Deterministic mode currently costs 17–90% wall time, because FEBio's element loops are serial; see `rust/BENCHMARKS.md`. Making those loops parallel *and* deterministic is the next item in `OPEN_ITEMS.md`.
+Material updates and the solid/biphasic element loops still run in parallel in deterministic mode. They compute element matrices on all threads and assemble them in element order, which gives exactly the serial result. Domains not yet converted run serially in deterministic mode (`OPEN_ITEMS.md` P12).
 
 ## Repository layout
 
