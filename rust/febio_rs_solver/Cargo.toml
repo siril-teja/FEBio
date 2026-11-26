@@ -1,0 +1,22 @@
+[package]
+name = "febio_rs_solver"
+version = "0.1.0"
+edition = "2021"
+description = "Parallel supernodal sparse direct solver (LDL^T / LU) for FEBio, exposed through a C ABI"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+faer = { version = "0.24.4", default-features = false, features = ["std", "rayon", "sparse-linalg"] }
+rayon = "1.10"
+libc = "0.2"
+metis-sys = { version = "0.3.2", default-features = false, features = ["vendored", "force-optimize-vendor"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false

@@ -330,6 +330,43 @@ if(USE_SUPERLU_MT)
     target_link_libraries(numcore PRIVATE ${SUPERLU_MT_LIB})
 endif()
 
+# Rust sparse direct solver (rust/febio_rs_solver), built with cargo
+option(USE_RUST_SOLVER "Build the parallel Rust sparse direct solver (requires cargo)" OFF)
+if(USE_RUST_SOLVER)
+    find_program(CARGO_EXE cargo HINTS $ENV{HOME}/.cargo/bin)
+    if(NOT CARGO_EXE)
+        message(SEND_ERROR "USE_RUST_SOLVER is ON but cargo was not found. Check CARGO_EXE.")
+    endif()
+    set(RUST_SOLVER_DIR ${PROJECT_SOURCE_DIR}/rust/febio_rs_solver)
+    set(RUST_SOLVER_TARGET_DIR ${CMAKE_BINARY_DIR}/rust_target)
+    # The solver is linked as a shared library (cdylib): faer's x86 gemm backend
+    # misbehaves when its static archive is embedded in another shared object.
+    if(WIN32)
+        set(RUST_SOLVER_SO febio_rs_solver.dll)
+        set(RUST_SOLVER_LIB ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/febio_rs_solver.dll.lib)
+    elseif(APPLE)
+        set(RUST_SOLVER_SO libfebio_rs_solver.dylib)
+        set(RUST_SOLVER_LIB ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${RUST_SOLVER_SO})
+    else()
+        set(RUST_SOLVER_SO libfebio_rs_solver.so)
+        set(RUST_SOLVER_LIB ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${RUST_SOLVER_SO})
+    endif()
+    add_custom_target(febio_rs_solver_build
+        COMMAND ${CARGO_EXE} build --release --target-dir ${RUST_SOLVER_TARGET_DIR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_SOLVER_TARGET_DIR}/release/${RUST_SOLVER_SO} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/
+        WORKING_DIRECTORY ${RUST_SOLVER_DIR}
+        BYPRODUCTS ${RUST_SOLVER_LIB}
+        USES_TERMINAL)
+    add_dependencies(numcore febio_rs_solver_build)
+    target_compile_definitions(numcore PRIVATE RUST_SOLVER)
+    target_include_directories(numcore PRIVATE ${RUST_SOLVER_DIR})
+    target_link_libraries(numcore PRIVATE ${RUST_SOLVER_LIB} ${CMAKE_DL_LIBS})
+    if(UNIX)
+        target_link_libraries(numcore PRIVATE pthread m)
+    endif()
+endif()
+
 # Link MKL
 if(USE_MKL)
     target_include_directories(numcore PRIVATE ${MKL_INC} ${OpenMP_C_LIBRARIES})

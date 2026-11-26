@@ -1,0 +1,24 @@
+== T=1
+analyze 1.973s nnz(L)=179846641 sn=8924 flops=4.729e11
+factor[1] 12.804s perturbed=0
+solve 0.6039s rel error 2.079e-14
+pardiso analyze 1.602s err=0 nnz(L)=189551789
+pardiso factor[1] 18.656s err=0 perturbed=0
+pardiso factor[2] 19.060s err=0 perturbed=0
+pardiso solve 0.5566s rel error 2.262e-15 (refine steps 1)
+== T=2
+analyze 2.094s nnz(L)=179846641 sn=8924 flops=4.729e11
+factor[1] 8.878s perturbed=0
+solve 0.4101s rel error 1.011e-14
+pardiso analyze 1.420s err=0 nnz(L)=187905933
+pardiso factor[1] 10.357s err=0 perturbed=0
+pardiso factor[2] 9.955s err=0 perturbed=0
+pardiso solve 0.3269s rel error 2.673e-15 (refine steps 1)
+== T=4
+analyze 1.994s nnz(L)=179846641 sn=8924 flops=4.729e11
+factor[1] 5.249s perturbed=0
+solve 0.2756s rel error 8.924e-15
+pardiso analyze 1.298s err=0 nnz(L)=187905933
+pardiso factor[1] 5.313s err=0 perturbed=0
+pardiso factor[2] 5.215s err=0 perturbed=0
+pardiso solve 0.1933s rel error 3.017e-15 (refine steps 1)
