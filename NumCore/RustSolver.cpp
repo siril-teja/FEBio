@@ -36,6 +36,14 @@ SOFTWARE.*/
 #endif
 #endif
 
+#if defined(RUST_SOLVER) && defined(__GNUC__)
+// Intel OpenMP runtime (libiomp5, used with MKL): after a parallel region, idle OpenMP
+// threads spin for KMP_BLOCKTIME (default 200 ms) before sleeping. Those spinning threads
+// compete for the cores the Rust solver's own thread pool needs. Weak reference so that
+// builds using GNU libgomp (no such function) still link.
+extern "C" void kmp_set_blocktime(int) __attribute__((weak));
+#endif
+
 BEGIN_FECORE_CLASS(RustSolver, LinearSolver)
 	ADD_PARAMETER(m_nthreads, "nthreads");
 	ADD_PARAMETER(m_ordering, "ordering");
@@ -43,6 +51,7 @@ BEGIN_FECORE_CLASS(RustSolver, LinearSolver)
 	ADD_PARAMETER(m_pivotEps, "pivot_eps");
 	ADD_PARAMETER(m_printLevel, "print_level");
 	ADD_PARAMETER(m_reuseOrdering, "reuse_ordering");
+	ADD_PARAMETER(m_ompBlocktime, "omp_blocktime");
 END_FECORE_CLASS();
 
 RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symmetric(true), m_solver(nullptr)
@@ -53,6 +62,7 @@ RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symme
 	m_pivotEps = 0.0;
 	m_printLevel = 0;
 	m_reuseOrdering = true;
+	m_ompBlocktime = 0;
 }
 
 SparseMatrix* RustSolver::CreateSparseMatrix(Matrix_Type ntype)
@@ -86,12 +96,17 @@ bool RustSolver::PreProcess()
 	// The Rust solver object survives Destroy() (FEBio calls Destroy + PreProcess whenever it
 	// rebuilds the matrix profile), so it can detect identical / similar sparsity patterns and
 	// reuse its symbolic analysis or ordering.
-	// use the number of threads requested by the user (in deterministic mode FEBio's own
-	// OpenMP loops run single-threaded; the Rust solver is deterministic for any thread count)
+	// use the number of threads requested by the user (the Rust solver is bitwise
+	// deterministic for any thread count)
 	int nthreads = m_nthreads;
 	if (nthreads <= 0) nthreads = FECoreThreads::RequestedThreads();
 	if (m_solver == nullptr)
 	{
+#if defined(__GNUC__)
+		// let idle OpenMP threads sleep right away instead of spinning while the
+		// Rust thread pool runs (-1 = leave the OpenMP runtime setting unchanged)
+		if ((m_ompBlocktime >= 0) && kmp_set_blocktime) kmp_set_blocktime(m_ompBlocktime);
+#endif
 		FrsSolver* s = frs_create(nthreads);
 		m_solver = s;
 		frs_set_option(s, FRS_OPT_ORDERING, m_ordering);

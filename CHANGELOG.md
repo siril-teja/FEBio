@@ -12,6 +12,11 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.3] - 2026-11-26
+
+### Performance
+- Rust solver: idle Intel OpenMP threads sleep instead of spinning while the Rust thread pool runs (`omp_blocktime`, default 0). Rust linear-solver time −3 to −15%; output byte-identical.
+
 ## [0.4.2] - 2026-11-26
 
 ### Performance
