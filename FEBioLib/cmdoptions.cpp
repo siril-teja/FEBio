@@ -24,6 +24,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "cmdoptions.h"
 #include "febio.h"
 #include <stdlib.h>
@@ -221,6 +222,11 @@ bool febio::ProcessOptionsString(const std::string& s, CMDOPTIONS& ops)
 		else if (strcmp(sz, "-noconfig") == 0)
 		{
 			ops.szcnf[0] = 0;
+		}
+		else if (strcmp(sz, "-nondeterministic") == 0)
+		{
+			// allow run-to-run variations in the last bits (parallel atomic assembly)
+			FECoreThreads::SetDeterministic(false);
 		}
 		else if (strncmp(sz, "-task", 5) == 0)
 		{

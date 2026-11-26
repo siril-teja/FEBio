@@ -28,6 +28,7 @@ SOFTWARE.*/
 
 #include "stdafx.h"
 #include "FECore.h"
+#include "fecore_threads.h"
 #include "FECoreKernel.h"
 #include "FEPrescribedDOF.h"
 #include "FENodalLoad.h"
@@ -96,6 +97,9 @@ const char* FECore::get_version_string()
 //-----------------------------------------------------------------------------
 void FECore::InitModule()
 {
+	// thread configuration (deterministic mode is on by default)
+	FECoreThreads::Initialize();
+
 	// initialize the element librar
 	FEElementLibrary::Initialize();
 

@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FEBioApp.h"
 #include "console.h"
 #include "CommandManager.h"
@@ -413,6 +414,11 @@ bool FEBioApp::ParseCmdLine(int nargs, char* argv[])
 		else if (strcmp(sz, "-noconfig") == 0)
 		{
 			ops.szcnf[0] = 0;
+		}
+		else if (strcmp(sz, "-nondeterministic") == 0)
+		{
+			// allow run-to-run variations in the last bits (parallel atomic assembly)
+			FECoreThreads::SetDeterministic(false);
 		}
 		else if (strncmp(sz, "-task", 5) == 0)
 		{
