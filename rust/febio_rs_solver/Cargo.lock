@@ -276,7 +276,7 @@ dependencies = [
 
 [[package]]
 name = "febio_rs_solver"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "faer",
  "libc",

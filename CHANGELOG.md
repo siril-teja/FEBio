@@ -12,6 +12,11 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.6] - 2026-11-26
+
+### Fixed
+- Rust solver: the default pivot-perturbation threshold for LDLᵀ is now 1e-13·max|Aᵢⱼ| (was 1e-8), the same as for LU. On the published Finley 2018 L4–L5 model, the old default perturbed genuine pivots: rigid-body and penalty rows are much stiffer than soft tissue. The nonlinear solve then needed 60 instead of 20 iterations over the first 4 steps. Now the Rust solver matches PARDISO's iteration count. Results on the regression set are unchanged.
+
 ## [0.4.5] - 2026-11-26
 
 ### Documentation

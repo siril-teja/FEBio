@@ -99,12 +99,15 @@ enum Kind {
     },
 }
 
+/// default pivot perturbation threshold, relative to max|A_ij| (PARDISO's unsymmetric default)
+pub const DEFAULT_PIVOT_EPS: f64 = 1e-13;
+
 pub struct Solver {
     pool: rayon::ThreadPool,
     pub nthreads: usize,
     pub ordering: Ordering,
     pub pivot_eps: f64,
-    /// pivot_eps was set explicitly (otherwise LU uses 1e-13, LDL^T 1e-8, as PARDISO)
+    /// pivot_eps was set explicitly (otherwise both LU and LDL^T use 1e-13 of max|A_ij|)
     pub pivot_eps_set: bool,
     pub par_flops: f64,
     /// 0: refine only if pivots were perturbed (max `max_refine` steps); n>0: always n steps
@@ -133,7 +136,7 @@ impl Solver {
             pool,
             nthreads,
             ordering: Ordering::Metis,
-            pivot_eps: 1e-8,
+            pivot_eps: DEFAULT_PIVOT_EPS,
             pivot_eps_set: false,
             par_flops: 4.0e6,
             refine_mode: 0,
@@ -298,9 +301,18 @@ impl Solver {
 
     pub fn factor(&mut self, vals: &[f64]) -> Result<(), String> {
         let t0 = Instant::now();
+        // Pivots smaller than pivot_eps * max|A_ij| are perturbed. The default is 1e-13 for
+        // both factorizations: the threshold is relative to the largest entry of the unscaled
+        // matrix, and spine models mix very stiff rigid-body/penalty rows with soft tissue,
+        // so a looser threshold (e.g. PARDISO's 1e-8, which PARDISO applies to a scaled
+        // matrix) perturbs genuine pivots and slows the nonlinear convergence.
         let opt = numeric::FactorOptions {
             nthreads: self.nthreads,
-            pivot_eps: self.pivot_eps,
+            pivot_eps: if self.pivot_eps_set {
+                self.pivot_eps
+            } else {
+                DEFAULT_PIVOT_EPS
+            },
             par_flops: self.par_flops,
         };
         match &mut self.kind {
@@ -352,12 +364,7 @@ impl Solver {
                 } else {
                     let old = num.take();
                     let nt = self.nthreads;
-                    // PARDISO's default perturbation for unsymmetric matrices is 1e-13 (iparm[9]=13)
-                    let eps = if self.pivot_eps_set {
-                        opt.pivot_eps
-                    } else {
-                        1e-13
-                    };
+                    let eps = opt.pivot_eps;
                     let r = self
                         .pool
                         .install(|| lu::factor(sym, lsym, v, sched, nt, eps, opt.par_flops, old));
