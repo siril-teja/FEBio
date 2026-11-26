@@ -54,21 +54,34 @@ FEElasticFiberMaterial::FEElasticFiberMaterial(FEModel* pfem) : FEElasticMateria
 
 //-----------------------------------------------------------------------------
 // get the fiber vector (in global coordinates)
+bool FEElasticFiberMaterial::Init()
+{
+	if (FEElasticMaterial::Init() == false) return false;
+	m_cacheFiber = (m_fiber != nullptr) && m_fiber->isReferenceInvariant() && LocalCSIsReferenceInvariant();
+	return true;
+}
+
+//-----------------------------------------------------------------------------
 vec3d FEElasticFiberMaterial::FiberVector(FEMaterialPoint& mp)
 {
+	// The reference fiber direction Q*fiber is constant for reference-invariant
+	// material axes and fiber generators: compute it once per material point.
+	// (memo keyed by this material and the point's reference position)
+	if (m_cacheFiber && (mp.m_cacheOwner == this) && (mp.m_cacheR0 == mp.m_r0))
+		return FiberPreStretch(mp.m_cacheVec);
+
 	// get the material coordinate system
 	mat3d Q = GetLocalCS(mp);
 
-	// get local fiber direction
+	// get the fiber vector in local coordinates
 	vec3d fiber = m_fiber->unitVector(mp);
 
 	// convert to global coordinates
 	vec3d a0 = Q*fiber;
-    
-    // account for prior deformation in multigenerational formulation
-    vec3d a = FiberPreStretch(a0);
-    
-	return a;
+	if (m_cacheFiber) { mp.m_cacheOwner = this; mp.m_cacheR0 = mp.m_r0; mp.m_cacheVec = a0; }
+
+	// account for prior deformation in multigenerational formulation
+	return FiberPreStretch(a0);
 }
 
 //-----------------------------------------------------------------------------

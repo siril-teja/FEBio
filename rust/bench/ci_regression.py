@@ -27,6 +27,14 @@ MODELS = [
     ("hex20_newton", GEN, ["--n", "4", "--elem", "hex20", "--newton"], None),
     ("hex8_nonsymmetric", GEN, ["--n", "6"],
      ("<symmetric_stiffness>symmetric</symmetric_stiffness>", "<symmetric_stiffness>non-symmetric</symmetric_stiffness>")),
+    ("hex8_fiber_mixture", GEN, ["--n", "6", "--newton"],
+     ('<material id="1" name="mat" type="neo-Hookean"><density>1</density><E>1</E><v>0.3</v></material>',
+      '<material id="1" name="mat" type="solid mixture"><density>1</density>'
+      '<solid type="neo-Hookean"><E>1</E><v>0.3</v></solid>'
+      '<solid type="fiber-exp-pow"><ksi>2</ksi><alpha>0</alpha><beta>2.5</beta><fiber type="cylindrical">'
+      '<center>0.5,0.5,0</center><axis>0,0,1</axis><vector>0,0.866,0.5</vector></fiber></solid>'
+      '<solid type="fiber-exp-pow"><ksi>2</ksi><alpha>0</alpha><beta>2.5</beta><fiber type="vector">1,0,1</fiber></solid>'
+      '</material>')),
     ("fsu_flex_contact", FSU, ["--mode", "flex", "--n", "12", "--nz", "4", "--steps", "5"], None),
     ("fsu_ar_contact", FSU, ["--mode", "ar", "--n", "12", "--nz", "4", "--steps", "5"], None),
     ("fsu_biphasic", FSU, ["--mode", "flex", "--n", "12", "--nz", "4", "--steps", "5", "--biphasic"], None),

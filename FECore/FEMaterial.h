@@ -76,6 +76,11 @@ public:
 	// evaluate local coordinate system at material point
 	mat3d GetLocalCS(const FEMaterialPoint& mp) override;
 
+	// true if GetLocalCS only depends on the material point's reference configuration
+	// (all material axes along the parent chain are reference-invariant), so that its
+	// value can be cached per material point
+	bool LocalCSIsReferenceInvariant();
+
 	// set the (local) material axis valuator
 	void SetMaterialAxis(FEMat3dValuator* val);
 

@@ -12,6 +12,11 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.1] - 2026-11-26
+
+### Performance
+- Fiber materials memoize the reference fiber direction per material point when all material axes and fiber generators depend only on the reference geometry. Model update −3 to −18%, output byte-identical.
+
 ## [0.4.0] - 2026-11-26
 
 First versioned release of FEBio-Rust. It covers everything merged so far.

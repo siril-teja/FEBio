@@ -136,6 +136,7 @@ void FEMaterialPoint::Serialize(DumpStream& ar)
 	{
 		ar & m_r0 & m_J0 & m_Jt;
 	}
+	if (ar.IsLoading()) m_cacheOwner = nullptr;
 	if (m_data) m_data->Serialize(ar);
 }
 
