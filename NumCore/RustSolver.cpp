@@ -41,6 +41,7 @@ BEGIN_FECORE_CLASS(RustSolver, LinearSolver)
 	ADD_PARAMETER(m_refine  , "refine");
 	ADD_PARAMETER(m_pivotEps, "pivot_eps");
 	ADD_PARAMETER(m_printLevel, "print_level");
+	ADD_PARAMETER(m_reuseOrdering, "reuse_ordering");
 END_FECORE_CLASS();
 
 RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symmetric(true), m_solver(nullptr)
@@ -50,11 +51,7 @@ RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symme
 	m_refine = 0;
 	m_pivotEps = 0.0;
 	m_printLevel = 0;
-}
-
-RustSolver::~RustSolver()
-{
-	Destroy();
+	m_reuseOrdering = true;
 }
 
 SparseMatrix* RustSolver::CreateSparseMatrix(Matrix_Type ntype)
@@ -84,17 +81,24 @@ bool RustSolver::PreProcess()
 {
 #ifdef RUST_SOLVER
 	if (m_pA == nullptr) return false;
-	if (m_solver) { frs_destroy((FrsSolver*)m_solver); m_solver = nullptr; }
 
+	// The Rust solver object survives Destroy() (FEBio calls Destroy + PreProcess whenever it
+	// rebuilds the matrix profile), so it can detect identical / similar sparsity patterns and
+	// reuse its symbolic analysis or ordering.
 	int nthreads = m_nthreads;
 #ifdef _OPENMP
 	if (nthreads <= 0) nthreads = omp_get_max_threads();
 #endif
-	FrsSolver* s = frs_create(nthreads);
-	m_solver = s;
-	frs_set_option(s, FRS_OPT_ORDERING, m_ordering);
-	if (m_pivotEps > 0) frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);	// 0 = solver default (as PARDISO: 1e-8 LDLT, 1e-13 LU)
-	frs_set_option(s, FRS_OPT_REFINE, m_refine);
+	if (m_solver == nullptr)
+	{
+		FrsSolver* s = frs_create(nthreads);
+		m_solver = s;
+		frs_set_option(s, FRS_OPT_ORDERING, m_ordering);
+		if (m_pivotEps > 0) frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);	// 0 = solver default (as PARDISO: 1e-8 LDLT, 1e-13 LU)
+		frs_set_option(s, FRS_OPT_REFINE, m_refine);
+		frs_set_option(s, FRS_OPT_REUSE_ORDERING, m_reuseOrdering ? 1.0 : 0.0);
+	}
+	FrsSolver* s = (FrsSolver*)m_solver;
 
 	int n = m_pA->Rows();
 	if (n == 0) return LinearSolver::PreProcess();
@@ -106,8 +110,9 @@ bool RustSolver::PreProcess()
 	if (m_printLevel > 0)
 	{
 		FrsStats st; frs_get_stats(s, &st);
-		feLog("\tRust solver: n = %lld, nnz(A) = %lld, nnz(L) = %lld, supernodes = %lld, threads = %d\n",
-			(long long)st.n, (long long)st.nnz_a, (long long)st.nnz_l, (long long)st.n_supernodes, nthreads);
+		feLog("\tRust solver: n = %lld, nnz(A) = %lld, nnz(L) = %lld, supernodes = %lld, threads = %d, analyses = %lld, reused = %lld\n",
+			(long long)st.n, (long long)st.nnz_a, (long long)st.nnz_l, (long long)st.n_supernodes, nthreads,
+			(long long)st.n_analyze, (long long)st.n_reused);
 	}
 	return LinearSolver::PreProcess();
 #else
@@ -148,18 +153,27 @@ bool RustSolver::BackSolve(double* x, double* b)
 
 void RustSolver::Destroy()
 {
+	// free the factors only; the symbolic analysis is kept for pattern reuse
+#ifdef RUST_SOLVER
+	if (m_solver) frs_release_numeric((FrsSolver*)m_solver);
+#endif
+	LinearSolver::Destroy();
+}
+
+RustSolver::~RustSolver()
+{
 #ifdef RUST_SOLVER
 	if (m_solver)
 	{
 		if (m_printLevel > 0)
 		{
 			FrsStats st; frs_get_stats((FrsSolver*)m_solver, &st);
-			feLog("\tRust solver: analyze %.3fs, %lld factorizations %.3fs, %lld solves %.3fs\n",
-				st.t_analyze, (long long)st.n_factor, st.t_factor, (long long)st.n_solve, st.t_solve);
+			feLog("\tRust solver: %lld analyses (%lld patterns reused) %.3fs, %lld factorizations %.3fs, %lld solves %.3fs, %lld fallbacks\n",
+				(long long)st.n_analyze, (long long)st.n_reused, st.t_analyze, (long long)st.n_factor, st.t_factor,
+				(long long)st.n_solve, st.t_solve, (long long)st.n_fallback);
 		}
 		frs_destroy((FrsSolver*)m_solver);
 		m_solver = nullptr;
 	}
 #endif
-	LinearSolver::Destroy();
 }

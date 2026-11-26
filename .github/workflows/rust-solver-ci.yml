@@ -1,0 +1,84 @@
+name: Rust solver CI
+
+# Gate for the Rust linear solver (rust/febio_rs_solver, NumCore/RustSolver).
+# Runs on every push to feature branches and on pull requests into develop.
+on:
+  push:
+    branches: ['ccr-**', 'feature/**', 'develop']
+  pull_request:
+    branches: ['develop']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-solver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust crate (fmt, clippy, tests)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: rust/febio_rs_solver
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal -c rustfmt,clippy && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/febio_rs_solver/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy (correctness and suspicious lints are errors)
+        run: cargo clippy --release --all-targets -- -D clippy::correctness -D clippy::suspicious
+      - name: Unit and integration tests
+        run: cargo test --release
+
+  febio:
+    name: FEBio build + PARDISO-vs-Rust regression
+    needs: rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: sudo apt-get update -q && sudo apt-get install -y -q cmake build-essential zlib1g-dev python3-venv
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-reg-${{ runner.os }}-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}
+      - name: MKL (PARDISO reference)
+        run: |
+          ARGS=$(ci/rust/setup-mkl.sh "$RUNNER_TEMP/mkl" 2> mkl.log)
+          cat mkl.log
+          echo "MKL_CMAKE_ARGS=$ARGS" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/mkl/venv/lib" >> "$GITHUB_ENV"
+      - name: Configure
+        run: cmake . -B cmbuild -DCMAKE_BUILD_TYPE=Release -DUSE_STATIC_STDLIBS=OFF -DUSE_RUST_SOLVER=ON $MKL_CMAKE_ARGS
+      - name: Build
+        run: cmake --build cmbuild -j $(nproc)
+      - name: Regression (PARDISO vs Rust)
+        run: |
+          python3 rust/bench/ci_regression.py --febio cmbuild/bin/febio4 --workdir "$RUNNER_TEMP/runs" \
+            --threads 2 --tol 1e-9 --json ci_regression.json --md ci_regression.md
+      - name: Summary
+        if: always()
+        run: test -f ci_regression.md && cat ci_regression.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-solver-regression
+          path: |
+            ci_regression.json
+            ci_regression.md

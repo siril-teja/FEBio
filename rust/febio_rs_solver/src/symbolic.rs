@@ -307,56 +307,82 @@ fn etree_postorder(parent: &[isize]) -> Vec<usize> {
 }
 
 pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
+    analyze_with_hint(a, ordering, None)
+}
+
+/// `hint`: a fill-reducing permutation (new -> old) to reuse instead of computing a new
+/// ordering, e.g. the one of a previous, slightly different sparsity pattern (contact).
+pub fn analyze_with_hint(
+    a: &LowerCsc,
+    ordering: Ordering,
+    hint: Option<&[usize]>,
+) -> Result<Symbolic, String> {
     let n = a.n;
     // ---- 1-3: graph, supervariables, ordering
-    let (xadj, adj) = full_adjacency(a);
-    let sv = supervariables(n, &xadj, &adj);
-    let nsv = sv.len() - 1;
-    let mut sv_of = vec![0usize; n];
-    for s in 0..nsv {
-        for j in sv[s]..sv[s + 1] {
-            sv_of[j] = s;
+    let prof = std::env::var_os("FRS_PROFILE").is_some();
+    let mut tlast = std::time::Instant::now();
+    let mut tick = |lab: &str| {
+        if prof {
+            eprintln!("  analyze {lab}: {:.3}s", tlast.elapsed().as_secs_f64());
         }
-    }
-    let perm0: Vec<usize> = match ordering {
-        Ordering::Natural => (0..n).collect(),
+        tlast = std::time::Instant::now();
+    };
+    let (perm0, nsv) = match hint {
+        Some(h) if h.len() == n => (h.to_vec(), 0),
         _ => {
-            // compressed graph
-            let mut cx = vec![0usize; nsv + 1];
-            let mut ca = Vec::with_capacity(adj.len() / 4 + 1);
-            let mut mark = vec![usize::MAX; nsv];
+            let (xadj, adj) = full_adjacency(a);
+            let sv = supervariables(n, &xadj, &adj);
+            let nsv = sv.len() - 1;
+            let mut sv_of = vec![0usize; n];
             for s in 0..nsv {
-                let j = sv[s];
-                mark[s] = s;
-                for &i in &adj[xadj[j]..xadj[j + 1]] {
-                    let t = sv_of[i];
-                    if mark[t] != s {
-                        mark[t] = s;
-                        ca.push(t);
-                    }
+                for j in sv[s]..sv[s + 1] {
+                    sv_of[j] = s;
                 }
-                cx[s + 1] = ca.len();
             }
-            let vw: Vec<i32> = (0..nsv).map(|s| (sv[s + 1] - sv[s]) as i32).collect();
-            let sperm = match ordering {
-                Ordering::Metis => order_metis(nsv, &cx, &ca, &vw),
-                _ => order_amd(nsv, &cx, &ca),
+            tick("graph+supervars");
+            let perm0: Vec<usize> = match ordering {
+                Ordering::Natural => (0..n).collect(),
+                _ => {
+                    // compressed graph
+                    let mut cx = vec![0usize; nsv + 1];
+                    let mut ca = Vec::with_capacity(adj.len() / 4 + 1);
+                    let mut mark = vec![usize::MAX; nsv];
+                    for s in 0..nsv {
+                        let j = sv[s];
+                        mark[s] = s;
+                        for &i in &adj[xadj[j]..xadj[j + 1]] {
+                            let t = sv_of[i];
+                            if mark[t] != s {
+                                mark[t] = s;
+                                ca.push(t);
+                            }
+                        }
+                        cx[s + 1] = ca.len();
+                    }
+                    let vw: Vec<i32> = (0..nsv).map(|s| (sv[s + 1] - sv[s]) as i32).collect();
+                    let sperm = match ordering {
+                        Ordering::Metis => order_metis(nsv, &cx, &ca, &vw),
+                        _ => order_amd(nsv, &cx, &ca),
+                    };
+                    let mut p = Vec::with_capacity(n);
+                    for &s in &sperm {
+                        p.extend(sv[s]..sv[s + 1]);
+                    }
+                    p
+                }
             };
-            let mut p = Vec::with_capacity(n);
-            for &s in &sperm {
-                p.extend(sv[s]..sv[s + 1]);
-            }
-            p
+            drop(adj);
+            drop(xadj);
+            (perm0, nsv)
         }
     };
-    drop(adj);
-    drop(xadj);
     let mut iperm0 = vec![0usize; n];
     for (new, &old) in perm0.iter().enumerate() {
         iperm0[old] = new;
     }
 
     // ---- 4: etree postorder, then faer supernodal symbolic
+    tick("ordering");
     let (cp, ri) = permuted_upper(a, &iperm0);
     let mut etree = vec![0isize; n];
     let mut cc = vec![0usize; n];
@@ -371,24 +397,35 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
             MemStack::new(&mut mem),
         );
     }
+    tick("etree1");
     let post = etree_postorder(&etree);
     let perm: Vec<usize> = post.iter().map(|&p| perm0[p]).collect();
     let mut iperm = vec![0usize; n];
     for (new, &old) in perm.iter().enumerate() {
         iperm[old] = new;
     }
-    let (cp, ri) = permuted_upper(a, &iperm);
+    // relabel etree and column counts (invariant under a postorder relabeling)
     {
-        let req = simplicial::prefactorize_symbolic_cholesky_scratch::<usize>(n, ri.len());
-        let mut mem = MemBuffer::new(req);
-        let au = SymbolicSparseColMatRef::new_checked(n, n, &cp, None, &ri);
-        simplicial::prefactorize_symbolic_cholesky::<usize>(
-            &mut etree,
-            &mut cc,
-            au,
-            MemStack::new(&mut mem),
-        );
+        let mut inv_post = vec![0usize; n];
+        for (newi, &p) in post.iter().enumerate() {
+            inv_post[p] = newi;
+        }
+        let mut et2 = vec![-1isize; n];
+        let mut cc2 = vec![0usize; n];
+        for j in 0..n {
+            let nj = inv_post[j];
+            et2[nj] = if etree[j] >= 0 {
+                inv_post[etree[j] as usize] as isize
+            } else {
+                -1
+            };
+            cc2[nj] = cc[j];
+        }
+        etree = et2;
+        cc = cc2;
     }
+    let (cp, ri) = permuted_upper(a, &iperm);
+    tick("etree2");
     let sym = {
         let req = StackReq::any_of(&[
             supernodal::factorize_supernodal_symbolic_cholesky_scratch::<usize>(n),
@@ -408,6 +445,7 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
     drop(cp);
     drop(ri);
 
+    tick("faer supernodal");
     // ---- 5: supernodal tree and numeric-phase maps
     let ns = sym.n_supernodes();
     let mut sn_begin = Vec::with_capacity(ns + 1);
@@ -495,6 +533,7 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
         }
     }
 
+    tick("tree");
     // A -> panel scatter
     let mut acount = vec![0usize; ns + 1];
     for j in 0..n {
@@ -534,6 +573,7 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
             apos[s] += 1;
         }
     }
+    tick("amap");
     // updates (left-looking): for each d, group its pattern rows by target supernode
     let mut ucount = vec![0usize; ns + 1];
     for d in 0..ns {
@@ -573,6 +613,7 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
         }
     }
 
+    tick("updates");
     Ok(Symbolic {
         n,
         perm,

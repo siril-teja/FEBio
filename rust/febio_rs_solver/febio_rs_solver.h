@@ -12,6 +12,7 @@ typedef struct {
 	double  flops;
 	double  t_analyze, t_factor, t_solve;
 	int64_t n_factor, n_solve, n_perturbed, n_refine;
+	int64_t n_analyze, n_reused, n_fallback;	/* new analyses, reused patterns, partial-pivoting fallbacks */
 } FrsStats;
 
 enum {
@@ -19,7 +20,8 @@ enum {
 	FRS_OPT_PIVOT_EPS = 2,	/* relative pivot perturbation (default 1e-8, as PARDISO) */
 	FRS_OPT_REFINE    = 3,	/* 0 = refine only if pivots were perturbed, n>0 = always n steps */
 	FRS_OPT_MAX_REFINE = 4,	/* max refinement steps in auto mode (default 2) */
-	FRS_OPT_PAR_FLOPS = 5	/* flop threshold for multithreaded dense kernels */
+	FRS_OPT_PAR_FLOPS = 5,	/* flop threshold for multithreaded dense kernels */
+	FRS_OPT_REUSE_ORDERING = 6	/* 1 (default): reuse the ordering when the pattern changes only slightly */
 };
 
 FrsSolver* frs_create(int nthreads);	/* nthreads = 0 -> all cores */
@@ -32,6 +34,8 @@ int  frs_analyze_unsymmetric(FrsSolver* s, int n, const int* ptr, const int* idx
 int  frs_factor(FrsSolver* s, const double* vals, int64_t nnz);
 int  frs_solve(FrsSolver* s, double* x, const double* b);
 void frs_get_stats(const FrsSolver* s, FrsStats* out);
+/* free the numerical factors, keep the symbolic analysis (pattern cache) */
+void frs_release_numeric(FrsSolver* s);
 
 #ifdef __cplusplus
 }

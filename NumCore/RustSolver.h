@@ -59,6 +59,7 @@ private:
 	int		m_refine;		// 0 = auto, n>0 = always n steps
 	double	m_pivotEps;
 	int		m_printLevel;
+	bool	m_reuseOrdering;	// reuse ordering for slightly changed patterns (contact)
 
 	DECLARE_FECORE_CLASS();
 };

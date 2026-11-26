@@ -32,6 +32,8 @@ pub struct Stats {
     pub n_perturbed: usize,
     pub n_refine: usize,
     pub n_fallback: usize,
+    pub n_analyze: usize,
+    pub n_reused: usize,
 }
 
 impl Default for Stats {
@@ -51,7 +53,21 @@ impl Default for Stats {
             n_perturbed: 0,
             n_refine: 0,
             n_fallback: 0,
+            n_analyze: 0,
+            n_reused: 0,
         }
+    }
+}
+
+impl Stats {
+    /// new sparsity pattern: reset the pattern description, keep cumulative counters/timers
+    fn reset_pattern(&mut self) {
+        self.n_analyze += 1;
+        self.n_supernodes = 0;
+        self.n_supervars = 0;
+        self.nnz_l = 0;
+        self.flops = 0.0;
+        self.n_perturbed = 0;
     }
 }
 
@@ -94,6 +110,8 @@ pub struct Solver {
     /// 0: refine only if pivots were perturbed (max `max_refine` steps); n>0: always n steps
     pub refine_mode: i32,
     pub max_refine: usize,
+    /// reuse the previous fill-reducing ordering when the pattern changes only slightly
+    pub reuse_ordering: bool,
     kind: Kind,
     pub stats: Stats,
 }
@@ -120,6 +138,7 @@ impl Solver {
             par_flops: 4.0e6,
             refine_mode: 0,
             max_refine: 2,
+            reuse_ordering: true,
             kind: Kind::None,
             stats: Stats::default(),
         }
@@ -150,6 +169,25 @@ impl Solver {
                 }
             }
         }
+        // FEBio calls PreProcess whenever it rebuilds the matrix profile (e.g. contact
+        // updates). Identical pattern -> keep the analysis; similar -> keep the ordering.
+        let mut hint: Option<Vec<usize>> = None;
+        if let Kind::Symmetric {
+            colptr,
+            rowidx,
+            sym,
+            ..
+        } = &self.kind
+        {
+            if colptr == &cp && rowidx == &ri {
+                self.stats.n_reused += 1;
+                self.stats.t_analyze += t0.elapsed().as_secs_f64();
+                return Ok(());
+            }
+            if self.reuse_ordering && sym.n == n && similar_nnz(rowidx.len(), ri.len()) {
+                hint = Some(sym.perm.clone());
+            }
+        }
         let ordering = self.ordering;
         let sym = self.pool.install(|| {
             let a = symbolic::LowerCsc {
@@ -157,9 +195,9 @@ impl Solver {
                 colptr: &cp,
                 rowidx: &ri,
             };
-            symbolic::analyze(&a, ordering)
+            symbolic::analyze_with_hint(&a, ordering, hint.as_deref())
         })?;
-        self.stats = Stats::default();
+        self.stats.reset_pattern();
         self.stats.n = n;
         self.stats.nnz_a = ri.len();
         self.stats.nnz_l = sym.nnz_l;
@@ -200,6 +238,24 @@ impl Solver {
                 vorder[rp[r] + q] = t;
             }
         }
+        let mut hint: Option<Vec<usize>> = None;
+        if let Kind::Unsymmetric {
+            rowptr,
+            colidx,
+            vorder: vo,
+            sym,
+            ..
+        } = &self.kind
+        {
+            if rowptr == &rp && colidx == &ci && vo == &vorder {
+                self.stats.n_reused += 1;
+                self.stats.t_analyze += t0.elapsed().as_secs_f64();
+                return Ok(());
+            }
+            if self.reuse_ordering && sym.n == n && similar_nnz(colidx.len(), ci.len()) {
+                hint = Some(sym.perm.clone());
+            }
+        }
         let ordering = self.ordering;
         let (sym, lsym) = self.pool.install(|| -> Result<_, String> {
             let (lcp, lri) = lu::symmetrized_lower(n, &rp, &ci);
@@ -208,11 +264,11 @@ impl Solver {
                 colptr: &lcp,
                 rowidx: &lri,
             };
-            let sym = symbolic::analyze(&a, ordering)?;
+            let sym = symbolic::analyze_with_hint(&a, ordering, hint.as_deref())?;
             let lsym = lu::analyze(&sym, &rp, &ci)?;
             Ok((sym, lsym))
         })?;
-        self.stats = Stats::default();
+        self.stats.reset_pattern();
         self.stats.n = n;
         self.stats.nnz_a = ci.len();
         self.stats.nnz_l = 2 * sym.nnz_l;
@@ -482,6 +538,12 @@ fn faer_lu(
     Lu::try_new_with_symbolic(slu, SparseColMatRef::new(s, v)).map_err(|e| format!("LU: {e:?}"))
 }
 
+/// patterns whose nonzero counts differ by < 5% are treated as similar (ordering reuse)
+fn similar_nnz(a: usize, b: usize) -> bool {
+    let (a, b) = (a as f64, b as f64);
+    (a - b).abs() <= 0.05 * a.max(b)
+}
+
 /// debugging aid: write the matrix as  n, nnz (i64), colptr (i32), rowidx (i32), values (f64)
 fn dump_lower(path: &str, cp: &[usize], ri: &[usize], v: &[f64]) {
     use std::io::Write;
@@ -558,6 +620,9 @@ pub struct FrsStats {
     pub n_solve: i64,
     pub n_perturbed: i64,
     pub n_refine: i64,
+    pub n_analyze: i64,
+    pub n_reused: i64,
+    pub n_fallback: i64,
 }
 
 fn report(e: String) -> i32 {
@@ -580,7 +645,7 @@ pub unsafe extern "C" fn frs_destroy(s: *mut Solver) {
 
 /// option keys: 1 = ordering (0 metis, 1 amd, 2 natural), 2 = pivot eps,
 /// 3 = refinement mode (0 auto, n>0 always n steps), 4 = max refinement steps (auto mode),
-/// 5 = parallel dense-kernel flop threshold
+/// 5 = parallel dense-kernel flop threshold, 6 = reuse ordering for similar patterns (0/1)
 #[no_mangle]
 pub unsafe extern "C" fn frs_set_option(s: *mut Solver, key: i32, val: f64) -> i32 {
     let s = &mut *s;
@@ -599,6 +664,7 @@ pub unsafe extern "C" fn frs_set_option(s: *mut Solver, key: i32, val: f64) -> i
         3 => s.refine_mode = val as i32,
         4 => s.max_refine = val.max(0.0) as usize,
         5 => s.par_flops = val,
+        6 => s.reuse_ordering = val != 0.0,
         _ => return -1,
     }
     0
@@ -666,6 +732,29 @@ pub unsafe extern "C" fn frs_solve(s: *mut Solver, x: *mut f64, b: *const f64) -
     }
 }
 
+/// free the numeric factors (keeps the symbolic analysis for pattern reuse)
+#[no_mangle]
+pub unsafe extern "C" fn frs_release_numeric(s: *mut Solver) {
+    let s = &mut *s;
+    match &mut s.kind {
+        Kind::Symmetric { num, vals, .. } => {
+            *num = None;
+            *vals = Vec::new();
+        }
+        Kind::Unsymmetric {
+            num,
+            fallback,
+            vals,
+            ..
+        } => {
+            *num = None;
+            *fallback = None;
+            *vals = Vec::new();
+        }
+        Kind::None => {}
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn frs_get_stats(s: *const Solver, out: *mut FrsStats) {
     let st = &(*s).stats;
@@ -683,5 +772,8 @@ pub unsafe extern "C" fn frs_get_stats(s: *const Solver, out: *mut FrsStats) {
         n_solve: st.n_solve as i64,
         n_perturbed: st.n_perturbed as i64,
         n_refine: st.n_refine as i64,
+        n_analyze: st.n_analyze as i64,
+        n_reused: st.n_reused as i64,
+        n_fallback: st.n_fallback as i64,
     };
 }
