@@ -10,7 +10,7 @@ Select it per model with
 
 Optional parameters: `nthreads` (default: `OMP_NUM_THREADS`), `ordering` (0 = METIS
 nested dissection, 1 = AMD), `refine` (0 = iterative refinement only if pivots were
-perturbed, n > 0 = always n steps), `pivot_eps` (default 1e-8), `print_level`.
+perturbed, n > 0 = always n steps), `pivot_eps` (default 1e-13), `print_level`.
 
 ## What it does
 
@@ -25,7 +25,7 @@ Symmetric matrices (FEBio `CompactSymmMatrix`, lower CSC == PARDISO's upper CSR)
    independent subtrees that are factored concurrently (sequential dense kernels), and
    the remaining top of the tree is processed with multithreaded dense kernels (faer
    gemm/trsm/LDLᵀ) and column-block-parallel descendant updates.
-   Tiny pivots are perturbed to ±1e-8·max|Aᵢⱼ| (PARDISO's strategy); iterative refinement
+   Tiny pivots are perturbed to ±1e-13·max|Aᵢⱼ| (static pivoting, as PARDISO); iterative refinement
    is applied automatically when that happens.
 3. **Solve:** supernodal forward/diagonal/backward substitution.
 
