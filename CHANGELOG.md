@@ -12,6 +12,17 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.0.0] - 2026-11-26
+
+### Breaking
+- FEBio-Rust is now **solid mechanics only**. Removed modules: `FEBioFluid` (CFD, FSI, fluid–solutes, thermo- and polar fluids), `FEBioMix` (biphasic, biphasic–solute, multiphasic), `FEBioRVE`, `FEBioOpt`, `FEImgLib` and `FEBioTest` (material diagnostics, `-d`). Models that use them no longer load.
+- Removed the `febio::RunMaterialTest` library API (it depended on `FEBioTest`).
+- The `febio4 -d` (diagnose) and `-s` (optimize) options now stop with "Don't know how to do task".
+- Removed the LEVMAR, NLOPT and FFTW build options (used only by the removed modules), `Documentation/`, the Xcode project and the upstream `ROADMAP.md`.
+
+### Changed
+- Spine surrogate (`gen_fsu.py`): `--biphasic` is replaced by `--friction mu` (frictional facets give a non-symmetric system). The CI regression set uses `fsu_friction_nonsym` in place of `fsu_biphasic`, so the Rust LU path is still tested end to end.
+
 ## [0.4.4] - 2026-11-26
 
 ### CI

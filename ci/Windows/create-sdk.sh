@@ -13,15 +13,10 @@ cp $FEBIO_REPO/FEBioConfig.cmake ${TARGET_DIR}/lib/cmake/FEBio
 sdkDirs=(
     FECore
     FEBioMech
-    FEBioMix
-    FEBioFluid
-    FEBioRVE
     FEBioPlot
     FEBioXML
     FEBioLib
     FEAMR
-    FEBioOpt
-    FEImgLib
 )
 
 for item in ${sdkDirs[@]}; do

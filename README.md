@@ -2,16 +2,17 @@
 
 Version: see [`VERSION`](VERSION) and [`CHANGELOG.md`](CHANGELOG.md). It is also shown in the `febio4` start-up banner.
 
-FEBio-Rust is a fork of [FEBio](https://github.com/febiosoftware/FEBio), the nonlinear finite element solver for biomechanics. It keeps FEBio's input format, materials and physics, and adds a **parallel sparse direct linear solver written in Rust**. The focus is faster spine and soft-tissue models with **bitwise-reproducible results**.
+FEBio-Rust is a **solid-mechanics-only** fork of [FEBio](https://github.com/febiosoftware/FEBio), the nonlinear finite element solver for biomechanics. It keeps FEBio's input format and its solid mechanics (hyperelastic and fiber-reinforced materials, rigid bodies, contact, discrete springs), and adds a **parallel sparse direct linear solver written in Rust**. The focus is fast, **bitwise-reproducible** nonlinear spine models.
 
 ## What is different from FEBio
 
+- **Solid mechanics only**: the fluid, FSI, biphasic/multiphasic, multiscale (RVE), optimization, image and diagnostic modules are removed (see [Scope](#scope)).
 - **Rust linear solver**: select it in any model with `<linear_solver type="rust"/>`.
   - Symmetric systems use a supernodal LDLᵀ factorization.
-  - Unsymmetric systems (biphasic tissue, non-symmetric contact) use a supernodal LU.
+  - Unsymmetric systems (frictional or non-symmetric contact, follower loads) use a supernodal LU.
   - It reuses its analysis when FEBio rebuilds a matrix with an unchanged sparsity pattern, which is common with contact.
 - **Same answers as MKL PARDISO**: identical iteration counts and displacements to ~1e-12 on every benchmark model (block models and an L4–L5 spine segment).
-- **Faster where it matters**: 1.3–2× faster linear solves on contact models at 1–4 threads, and 5–8× on biphasic (unsymmetric) disc models. Full numbers in [`rust/BENCHMARKS.md`](rust/BENCHMARKS.md).
+- **Faster where it matters**: 1.3–2× faster linear solves on contact models at 1–4 threads, and 5–8× on unsymmetric systems. Full numbers in [`rust/BENCHMARKS.md`](rust/BENCHMARKS.md).
 - **Bitwise-reproducible runs (default)**: the same input gives byte-identical output on every run.
   - With the Rust solver, the output is also identical for any thread count.
   - Opt out with `-nondeterministic`; see [Determinism](#determinism).
@@ -49,7 +50,7 @@ FEBio's element loops normally add contributions to the global matrix and vector
 
 - **FEBio's own loops:**
   - material updates run on all threads, since each element only writes its own data;
-  - solid, three-field and biphasic assembly computes element contributions in parallel and adds them in element order;
+  - solid and three-field assembly computes element contributions in parallel and adds them in element order;
   - every other OpenMP loop runs on one thread.
 - **The Rust solver** uses all requested threads (`OMP_NUM_THREADS` or `nthreads`). Its arithmetic is fixed regardless of scheduling, so the solution is bitwise identical run to run *and* for any thread count.
 - **MKL PARDISO** runs in MKL's conditional-numerical-reproducibility mode (`MKL_CBWR_AUTO`), which makes it reproducible run to run for a fixed thread count.
@@ -59,7 +60,13 @@ FEBio's element loops normally add contributions to the global matrix and vector
 | deterministic (default) | — | byte-identical output on every run |
 | non-deterministic | `febio4 -nondeterministic …` or `FEBIO_DETERMINISTIC=0` | FEBio's parallel atomic assembly as upstream; last-bit differences between runs |
 
-Material updates and the solid/biphasic element loops still run in parallel in deterministic mode. They compute element matrices on all threads and assemble them in element order, which gives exactly the serial result. Domains not yet converted run serially in deterministic mode (`OPEN_ITEMS.md` P12).
+Material updates and the solid element loops still run in parallel in deterministic mode. They compute element matrices on all threads and assemble them in element order, which gives exactly the serial result. Domains not yet converted run serially in deterministic mode (`OPEN_ITEMS.md` P12).
+
+## Scope
+
+Kept: `FECore`, `FEBioMech` (solid mechanics, rigid bodies, contact, discrete elements), `FEBioXML`, `FEBioPlot`, `NumCore` (linear solvers), `FEAMR`, `FEBioLib`, `FEBio` (the `febio4` executable).
+
+Removed in 1.0.0: `FEBioFluid` (CFD, FSI, fluid–solutes, thermo- and polar fluids), `FEBioMix` (biphasic, biphasic–solute, multiphasic), `FEBioRVE` (multiscale), `FEBioOpt` (parameter optimization), `FEImgLib`, `FEBioTest` (material diagnostics, `-d`), `Documentation/` and the Xcode project. Models that use those modules no longer load. Use upstream FEBio for them.
 
 ## Repository layout
 

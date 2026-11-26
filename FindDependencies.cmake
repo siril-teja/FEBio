@@ -102,35 +102,6 @@ else()
 	option(USE_MKL "Required for pardiso and iterative solvers" OFF)
 endif()
 
-# FFTW
-if(WIN32)
-	find_path(FFTW_INC fftw3.h
-      PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/*
-      PATH_SUFFIXES "include" "fftw*" "include/fftw*"
-      DOC "FFTW include directory")
-	find_library(FFTW_LIB fftw3 libfftw3-3
-      PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/*
-      PATH_SUFFIXES "vs2017/Release"
-      DOC "FFTW library path")
-else()
-	find_path(FFTW_INC fftw3.h
-      PATHS /usr/local/ /opt/fftw* $ENV{HOME}/* $ENV{HOME}/*/*
-      PATH_SUFFIXES "include" "fftw*" "include/fftw*"
-	  DOC "FFTW include directory")
-	find_library(FFTW_LIB fftw3
-      PATHS /usr/local/ /opt/fftw* $ENV{HOME}/* $ENV{HOME}/*/*
-      PATH_SUFFIXES "lib" "build" "cbuild" "cmbuild"
-	  DOC "FFTW library path")
-endif()	
-
-if(FFTW_INC AND FFTW_LIB)		
-	option(USE_FFTW "Required for FFTW functions" ON)
-    mark_as_advanced(FFTW_INC FFTW_LIB)
-else()
-	option(USE_FFTW "Required for FFTW functions" OFF)
-    mark_as_advanced(CLEAR FFTW_INC FFTW_LIB)
-endif()
-
 # HYPRE
 if(WIN32)
 	find_path(HYPRE_INC HYPRE_IJ_mv.h
@@ -198,58 +169,6 @@ else()
 	option(USE_MMG "Required for MMG use" OFF)
     mark_as_advanced(CLEAR MMG_INC MMG_LIB MMGS_LIB)
 endif()
-
-# LEVMAR
-if(WIN32)
-	find_path(LEVMAR_INC levmar.h PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/*
-      PATH_SUFFIXES "levmar"
-      DOC "Levmar include directory")
-	find_library(LEVMAR_LIB levmar PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/*
-      PATH_SUFFIXES "vs2017/Release"
-      DOC "Levmar library path")
-else()
-	find_path(LEVMAR_INC levmar.h PATHS /usr/local/ /opt/levmar* $ENV{HOME}/* $ENV{HOME}/*/*
-      PATH_SUFFIXES "include" "levmar" "include/levmar"
-		DOC "Levmar include directory")
-	find_library(LEVMAR_LIB levmar PATHS /usr/local/ /opt/levmar* $ENV{HOME}/* $ENV{HOME}/*/*
-        PATH_SUFFIXES "lib" "build" "cbuild" "cmbuild"
-		DOC "Levmar library path")
-endif()
-
-if(LEVMAR_INC AND LEVMAR_LIB)		
-	option(USE_LEVMAR "Required for optimization in FEBio" ON)
-    mark_as_advanced(LEVMAR_INC LEVMAR_LIB)
-else()
-	option(USE_LEVMAR "Required for optimization in FEBio" OFF)
-    mark_as_advanced(CLEAR LEVMAR_INC LEVMAR_LIB)
-endif()
-
-# NLOPT
-if(WIN32)
-	find_path(NLOPT_INC nlopt.h PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/* 
-      PATH_SUFFIXES "nlopt"
-      DOC "NLOPT include directory")
-	find_library(NLOPT_LIB nlopt PATHS C::/Program\ Files/* $ENV{HOMEPATH}/* $ENV{HOMEPATH}/*/*
-      PATH_SUFFIXES "vs2017/Release"
-      DOC "NLOPT library path")
-else()
-	find_path(NLOPT_INC nlopt.h PATHS /usr/local/ /opt/nlopt* $ENV{HOME}/* $ENV{HOME}/*/*
-      PATH_SUFFIXES "include" "nlopt" "include/nlopt"
-		DOC "NLOPT include directory")
-	find_library(NLOPT_LIB nlopt PATHS /usr/local/ /opt/nlopt* $ENV{HOME}/* $ENV{HOME}/*/*
-        PATH_SUFFIXES "lib" "build" "cbuild" "cmbuild"
-		DOC "NLOPT library path")
-endif()
-
-if(NLOPT_INC AND NLOPT_LIB)		
-	option(USE_NLOPT "Required for optimization in FEBio" ON)
-    mark_as_advanced(NLOPT_INC NLOPT_LIB)
-else()
-	option(USE_NLOPT "Required for optimization in FEBio" OFF)
-    mark_as_advanced(CLEAR NLOPT_INC NLOPT_LIB)
-endif()
-
-
 
 # SuperLU_MT
 if (WIN32)

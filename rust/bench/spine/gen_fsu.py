@@ -11,12 +11,12 @@ model ingredients that dominate solver cost in published FEBio spine models:
     bonded to the vertebrae via rigid node sets,
   * left/right facet joints: cartilage pads with sliding-elastic contact,
   * seven ligament groups as tension-only springs (ALL, PLL, LF, ISL, SSL, ITL, CL),
-  * optional biphasic disc (unsymmetric system, transient creep).
+  * optional facet friction (--friction mu): non-symmetric contact stiffness.
 
 Coordinates in mm (x lateral/right, y anterior, z superior), forces in N, moments N*mm,
 stress MPa.
 
-usage: gen_fsu.py --mode flex|ext|lb|ar [--n 24] [--nz 8] [--solver pardiso] [--biphasic] -o out.feb
+usage: gen_fsu.py --mode flex|ext|lb|ar [--n 24] [--nz 8] [--solver pardiso] [--friction 0.1] -o out.feb
 """
 import argparse
 import math
@@ -133,7 +133,8 @@ def main():
     ap.add_argument("--nz", type=int, default=8, help="disc divisions through height")
     ap.add_argument("--solver", default="pardiso")
     ap.add_argument("--steps", type=int, default=10)
-    ap.add_argument("--biphasic", action="store_true")
+    ap.add_argument("--friction", type=float, default=0.0,
+                    help="facet friction coefficient; > 0 gives a non-symmetric system")
     ap.add_argument("--newton", action="store_true")
     ap.add_argument("-o", required=True)
     a = ap.parse_args()
@@ -170,13 +171,13 @@ def main():
     w = L.append
     w('<?xml version="1.0" encoding="ISO-8859-1"?>')
     w('<febio_spec version="4.0">')
-    w(f'<Module type="{"biphasic" if a.biphasic else "solid"}"/>')
+    w('<Module type="solid"/>')
     w('<Control>')
-    w(f'<analysis>{"TRANSIENT" if a.biphasic else "STATIC"}</analysis>')
+    w('<analysis>STATIC</analysis>')
     w(f'<time_steps>{a.steps}</time_steps><step_size>{1.0 / a.steps}</step_size>')
-    w(f'<solver type="{"biphasic" if a.biphasic else "solid"}">')
-    if not a.biphasic:
-        w('<symmetric_stiffness>symmetric</symmetric_stiffness>')
+    w('<solver type="solid">')
+    sym = a.friction == 0.0
+    w(f'<symmetric_stiffness>{"symmetric" if sym else "non-symmetric"}</symmetric_stiffness>')
     w('<max_refs>25</max_refs><dtol>0.001</dtol><etol>0.01</etol><rtol>0</rtol><lstol>0.9</lstol>')
     w(f'<qn_method type="BFGS"><max_ups>{0 if a.newton else 10}</max_ups></qn_method>')
     w(f'<linear_solver type="{a.solver}"/>')
@@ -194,17 +195,8 @@ def main():
     c30, s30 = math.cos(math.radians(30)), math.sin(math.radians(30))
     ann_mat = ('<solid type="Mooney-Rivlin"><c1>0.18</c1><c2>0.045</c2></solid>'
                + fib.format(ksi=8.0, c=c30, s=s30) + fib.format(ksi=8.0, c=c30, s=-s30))
-    if a.biphasic:
-        # biphasic disc: solid phase as above, isotropic constant permeability
-        w('<material id="3" name="nucleus" type="biphasic"><phi0>0.2</phi0>'
-          f'<solid type="Mooney-Rivlin">{nuc_solid}</solid>'
-          '<permeability type="perm-const-iso"><perm>0.0003</perm></permeability></material>')
-        w('<material id="4" name="annulus" type="biphasic"><phi0>0.3</phi0>'
-          f'<solid type="uncoupled solid mixture"><k>20</k>{ann_mat}</solid>'
-          '<permeability type="perm-const-iso"><perm>0.0002</perm></permeability></material>')
-    else:
-        w(f'<material id="3" name="nucleus" type="Mooney-Rivlin"><density>1e-6</density>{nuc_solid}</material>')
-        w(f'<material id="4" name="annulus" type="uncoupled solid mixture"><density>1e-6</density><k>20</k>{ann_mat}</material>')
+    w(f'<material id="3" name="nucleus" type="Mooney-Rivlin"><density>1e-6</density>{nuc_solid}</material>')
+    w(f'<material id="4" name="annulus" type="uncoupled solid mixture"><density>1e-6</density><k>20</k>{ann_mat}</material>')
     w('<material id="5" name="cartilage" type="neo-Hookean"><density>1e-6</density><E>10</E><v>0.4</v></material>')
     w('</Material>')
 
@@ -254,8 +246,6 @@ def main():
     w('<bc name="disc_L5" type="rigid" node_set="disc_bot"><rb>L5</rb></bc>')
     w('<bc name="facet_L4" type="rigid" node_set="facet_L4_back"><rb>L4</rb></bc>')
     w('<bc name="facet_L5" type="rigid" node_set="facet_L5_back"><rb>L5</rb></bc>')
-    if a.biphasic:
-        pass  # free-draining is the default for exposed biphasic surfaces (zero pressure not prescribed)
     w('</Boundary>')
 
     w('<Rigid>')
@@ -270,8 +260,8 @@ def main():
     for side in ("R", "L"):
         w(f'<contact name="facet{side}" type="sliding-elastic" surface_pair="facet{side}">'
           '<laugon>PENALTY</laugon><penalty>1</penalty><auto_penalty>1</auto_penalty><two_pass>0</two_pass>'
-          '<symmetric_stiffness>1</symmetric_stiffness><search_tol>0.01</search_tol><search_radius>5</search_radius>'
-          '<tension>0</tension><fric_coeff>0</fric_coeff></contact>')
+          f'<symmetric_stiffness>{1 if sym else 0}</symmetric_stiffness><search_tol>0.01</search_tol><search_radius>5</search_radius>'
+          f'<tension>0</tension><fric_coeff>{a.friction:g}</fric_coeff></contact>')
     w('</Contact>')
 
     w('<Discrete>')

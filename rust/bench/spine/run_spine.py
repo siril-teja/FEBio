@@ -18,16 +18,16 @@ LITERATURE = {  # Niosi et al. 2006 Eur Spine J 15:913, intact L3-L4, +-7.5 Nm, 
 AXIS = {"flex": 0, "ext": 0, "lb": 1, "ar": 2}
 
 CASES = [
-    # name, mode, n, nz, biphasic, solvers, threads
-    ("fsu_n24_flex", "flex", 24, 8, False, [1, 4]),
-    ("fsu_n24_ext", "ext", 24, 8, False, [1, 4]),
-    ("fsu_n24_lb", "lb", 24, 8, False, [1, 4]),
-    ("fsu_n24_ar", "ar", 24, 8, False, [1, 4]),
-    ("fsu_n40_flex", "flex", 40, 12, False, [1, 4]),
-    ("fsu_n40_ar", "ar", 40, 12, False, [1, 4]),
-    ("fsu_n56_flex", "flex", 56, 16, False, [4]),
-    ("fsu_bp_n24_flex", "flex", 24, 8, True, [1, 4]),
-    ("fsu_bp_n40_flex", "flex", 40, 12, True, [4]),
+    # name, mode, n, nz, facet friction, threads
+    ("fsu_n24_flex", "flex", 24, 8, 0.0, [1, 4]),
+    ("fsu_n24_ext", "ext", 24, 8, 0.0, [1, 4]),
+    ("fsu_n24_lb", "lb", 24, 8, 0.0, [1, 4]),
+    ("fsu_n24_ar", "ar", 24, 8, 0.0, [1, 4]),
+    ("fsu_n40_flex", "flex", 40, 12, 0.0, [1, 4]),
+    ("fsu_n40_ar", "ar", 40, 12, 0.0, [1, 4]),
+    ("fsu_n56_flex", "flex", 56, 16, 0.0, [4]),
+    ("fsu_fric_n24_flex", "flex", 24, 8, 0.1, [1, 4]),
+    ("fsu_fric_n40_flex", "flex", 40, 12, 0.1, [4]),
 ]
 
 def rom_deg(rb_file, mode):
@@ -49,7 +49,7 @@ def main():
     a.febio = os.path.abspath(a.febio)  # runs use the model directory as cwd
     os.makedirs(a.workdir, exist_ok=True)
     res = json.load(open(a.out)) if os.path.exists(a.out) else []
-    for name, mode, n, nz, bp, threads in CASES:
+    for name, mode, n, nz, mu, threads in CASES:
         if a.cases != "all" and name not in a.cases.split(","):
             continue
         ref = None
@@ -60,7 +60,7 @@ def main():
             stem = f"{name}_{sol}"
             feb = os.path.join(a.workdir, stem + ".feb")
             g = [sys.executable, os.path.join(HERE, "gen_fsu.py"), "--mode", mode, "--n", str(n), "--nz", str(nz),
-                 "--solver", sol, "-o", feb] + (["--biphasic"] if bp else [])
+                 "--solver", sol, "--friction", str(mu), "-o", feb]
             subprocess.run(g, check=True, capture_output=True)
             for nt in threads:
                 env = dict(os.environ, OMP_NUM_THREADS=str(nt), MKL_NUM_THREADS=str(nt))
@@ -69,7 +69,7 @@ def main():
                                capture_output=True)
                 wall = time.time() - t0
                 log = open(feb[:-4] + ".log").read()
-                r = dict(case=name, mode=mode, biphasic=bp, solver=sol, threads=nt, wall=wall,
+                r = dict(case=name, mode=mode, friction=mu, solver=sol, threads=nt, wall=wall,
                          ok="N O R M A L   T E R M I N A T I O N" in log,
                          neq=ival(log, "Nr of equations"), total=tsec(log, "Total elapsed time"),
                          linsolve=tsec(log, "time in linear solver"), iters=ival(log, "Total number of equilibrium iterations"),

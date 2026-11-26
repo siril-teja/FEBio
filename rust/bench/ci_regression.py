@@ -37,7 +37,7 @@ MODELS = [
       '</material>')),
     ("fsu_flex_contact", FSU, ["--mode", "flex", "--n", "12", "--nz", "4", "--steps", "5"], None),
     ("fsu_ar_contact", FSU, ["--mode", "ar", "--n", "12", "--nz", "4", "--steps", "5"], None),
-    ("fsu_biphasic", FSU, ["--mode", "flex", "--n", "12", "--nz", "4", "--steps", "5", "--biphasic"], None),
+    ("fsu_friction_nonsym", FSU, ["--mode", "flex", "--n", "12", "--nz", "4", "--steps", "5", "--friction", "0.1"], None),
 ]
 
 def run(febio, workdir, name, gen, args, edit, solver, threads, tag=""):
