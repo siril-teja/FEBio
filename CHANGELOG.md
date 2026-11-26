@@ -12,6 +12,11 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.5] - 2026-11-26
+
+### Documentation
+- `ROADMAP.md`: objective, targets and the phased plan; each item is one pull request. Replaces upstream FEBio's roadmap.
+
 ## [0.4.4] - 2026-11-26
 
 ### CI
