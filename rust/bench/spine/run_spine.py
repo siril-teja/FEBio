@@ -26,8 +26,8 @@ CASES = [
     ("fsu_n40_flex", "flex", 40, 12, 0.0, [1, 4]),
     ("fsu_n40_ar", "ar", 40, 12, 0.0, [1, 4]),
     ("fsu_n56_flex", "flex", 56, 16, 0.0, [4]),
-    ("fsu_fric_n24_flex", "flex", 24, 8, 0.1, [1, 4]),
-    ("fsu_fric_n40_flex", "flex", 40, 12, 0.1, [4]),
+    ("fsu_fric_n24_ar", "ar", 24, 8, 0.1, [1, 4]),
+    ("fsu_fric_n40_ar", "ar", 40, 12, 0.1, [4]),
 ]
 
 def rom_deg(rb_file, mode):

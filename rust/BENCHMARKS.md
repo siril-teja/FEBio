@@ -1,6 +1,6 @@
 # Rust solver benchmarks
 
-> **Note (1.0.0):** the biphasic rows below (`fsu_bp_*`) were measured before FEBio-Rust became solid-mechanics only. The biphasic module is now removed. The unsymmetric LU path is still used, and is regression-tested with frictional facet contact (`gen_fsu.py --friction`).
+> **Note (1.0.0):** the biphasic rows below (`fsu_bp_*`) were measured before FEBio-Rust became solid-mechanics only. The biphasic module is now removed. The unsymmetric LU path is still used, and is regression-tested with frictional facet contact (`gen_fsu.py --mode ar --friction 0.1`).
 
 ## Setup
 

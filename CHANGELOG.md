@@ -21,7 +21,7 @@ The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0)
 - Removed the LEVMAR, NLOPT and FFTW build options (used only by the removed modules), `Documentation/`, the Xcode project and the upstream `ROADMAP.md`.
 
 ### Changed
-- Spine surrogate (`gen_fsu.py`): `--biphasic` is replaced by `--friction mu` (frictional facets give a non-symmetric system). The CI regression set uses `fsu_friction_nonsym` in place of `fsu_biphasic`, so the Rust LU path is still tested end to end.
+- Spine surrogate (`gen_fsu.py`): `--biphasic` is replaced by `--friction mu` (frictional facets give a non-symmetric system; they engage in axial rotation and extension). The CI regression set uses `fsu_friction_nonsym` in place of `fsu_biphasic`, so the Rust LU path is still tested end to end.
 
 ## [0.4.4] - 2026-11-26
 
