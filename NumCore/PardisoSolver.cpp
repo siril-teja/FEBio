@@ -32,6 +32,7 @@ SOFTWARE.*/
 #include "PardisoSolver.h"
 #include "MatrixTools.h"
 #include <FECore/log.h>
+#include <FECore/fecore_threads.h>
 
 //! This implementation of the Pardiso solver is for the version
 //! available in the Intel MKL.
@@ -180,6 +181,11 @@ bool PardisoSolver::PreProcess()
 	// number of processors: This parameter is no longer used.
 	// Use OMP_NUM_THREADS
 	// m_iparm[2] = m_numthreads;
+
+	// In deterministic mode FEBio's own OpenMP loops are single-threaded, but MKL
+	// (in conditional-numerical-reproducibility mode, see NumCore::InitModule) may
+	// use all requested threads and stays reproducible.
+	if (FECoreThreads::IsDeterministic()) mkl_set_num_threads(FECoreThreads::RequestedThreads());
 
 	m_maxfct = 1;	/* Maximum number of numerical factorizations */
 	m_mnum = 1;	/* Which factorization to use */

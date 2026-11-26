@@ -10,7 +10,10 @@ FEBio-Rust is a fork of [FEBio](https://github.com/febiosoftware/FEBio), the non
   - It reuses its analysis when FEBio rebuilds a matrix with an unchanged sparsity pattern, which is common with contact.
 - **Same answers as MKL PARDISO**: identical iteration counts and displacements to ~1e-12 on every benchmark model (block models and an L4–L5 spine segment).
 - **Faster where it matters**: 1.3–2× faster linear solves on contact models at 1–4 threads, and 5–8× on biphasic (unsymmetric) disc models. Full numbers in [`rust/BENCHMARKS.md`](rust/BENCHMARKS.md).
-- **CI-gated changes**: every change to `main` goes through a pull request. CI builds FEBio with both solvers and checks that results are unchanged.
+- **Bitwise-reproducible runs (default)**: the same input gives byte-identical output on every run.
+  - With the Rust solver, the output is also identical for any thread count.
+  - Opt out with `-nondeterministic`; see [Determinism](#determinism).
+- **CI-gated changes**: every change to `main` goes through a pull request. CI builds FEBio with both solvers and checks that results are unchanged and reproducible.
 
 ## Quick start
 
@@ -38,6 +41,21 @@ Optional solver parameters: `nthreads`, `ordering` (0 = METIS, 1 = AMD), `refine
 
 For an MKL build (PARDISO), see `ci/rust/setup-mkl.sh` and [BUILD.md](BUILD.md).
 
+## Determinism
+
+FEBio's element loops normally add contributions to the global matrix and vectors from several threads with atomic operations. The order of floating-point additions then varies from run to run, and so do the last bits of the results. FEBio-Rust removes that variation by default:
+
+- **FEBio's own loops** (assembly, residual, material updates) run on one thread in deterministic mode.
+- **The Rust solver** uses all requested threads (`OMP_NUM_THREADS` or `nthreads`). Its arithmetic is fixed regardless of scheduling, so the solution is bitwise identical run to run *and* for any thread count.
+- **MKL PARDISO** runs in MKL's conditional-numerical-reproducibility mode (`MKL_CBWR_AUTO`), which makes it reproducible run to run for a fixed thread count.
+
+| mode | how | result |
+|---|---|---|
+| deterministic (default) | — | byte-identical output on every run |
+| non-deterministic | `febio4 -nondeterministic …` or `FEBIO_DETERMINISTIC=0` | FEBio's parallel atomic assembly as upstream; last-bit differences between runs |
+
+Deterministic mode currently costs 17–90% wall time, because FEBio's element loops are serial; see `rust/BENCHMARKS.md`. Making those loops parallel *and* deterministic is the next item in `OPEN_ITEMS.md`.
+
 ## Repository layout
 
 | path | contents |
@@ -56,7 +74,8 @@ For an MKL build (PARDISO), see `ci/rust/setup-mkl.sh` and [BUILD.md](BUILD.md).
 3. CI (`.github/workflows/rust-solver-ci.yml`) must pass:
    - `cargo fmt`, `clippy` and the Rust tests;
    - an FEBio build with MKL and the Rust solver;
-   - the regression gate: each model is run with PARDISO and with the Rust solver, and must produce identical iteration counts and displacements within 1e-9.
+   - the regression gate: each model is run with PARDISO and with the Rust solver, and must produce identical iteration counts and displacements within 1e-9;
+   - the determinism gate: repeated runs must produce byte-identical output (both solvers), and the Rust solver's output must be byte-identical on 1 and N threads.
 
 ## Status and limitations
 

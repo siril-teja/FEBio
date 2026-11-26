@@ -133,3 +133,45 @@ Times are in seconds. "lin." is FEBio's "time in linear solver". ROM is the L4 r
 3. **Faster symmetric factorization** at 1–2 threads, as in the block benchmarks above.
 
 The smallest symmetric speed-up is `fsu_n40_ar` at 4 threads (1.08×). Axial rotation engages facet contact earlier, so the profile changes more often and some reformations need a full analysis.
+
+---
+
+# Determinism
+
+**Sources of run-to-run variation found** (verified by repeated runs and byte comparison of the output):
+
+1. **FEBio assembly.** The element loops (`#pragma omp parallel for`) add element matrices and vectors into the global system with `#pragma omp atomic`. The summation order follows thread timing.
+2. **MKL PARDISO.** Multithreaded factorization without conditional numerical reproducibility (CNR).
+3. **Rust solver.**
+   - The parallel forward-solve gather used a `rayon` fold/reduce, whose split points depend on timing.
+   - METIS keeps its random-number generator in global state, so two concurrent analyses in one process interleave draws.
+   - The 1-thread solve used a different (right-looking) algorithm from the parallel one.
+   - The symmetric update kernel split work differently for different thread counts.
+
+**Fixes.**
+- **Rust solver:**
+  - the gather sums fixed-size chunks in a fixed order;
+  - METIS calls are serialized;
+  - one solve algorithm is used for every thread count;
+  - the symmetric update uses a single gemm aligned to the update's first row.
+  - The tests verify that faer's parallel gemm, LDLᵀ and triangular solve are bitwise identical to their sequential versions. The solver is now bitwise reproducible and **thread-count independent** (tests: `deterministic_*`, `thread_count_independent_results`, `tests/kernels.rs`).
+- **FEBio:** deterministic mode, on by default (`FECore/fecore_threads.*`). FEBio's OpenMP loops run on one thread. Linear solvers keep the user's thread count. MKL runs with `mkl_cbwr_set(MKL_CBWR_AUTO)`. `-nondeterministic` / `FEBIO_DETERMINISTIC=0` restores the upstream behavior.
+
+**Verification.** Spine FSU with facet contact, 4 threads:
+- the Rust solver gives 1 distinct output over 3 runs, and byte-identical output for 1, 3 and 4 threads;
+- PARDISO gives 1 distinct output over 3 runs;
+- with `-nondeterministic`, 2 runs give 2 distinct outputs.
+
+The CI regression gate repeats every model for both solvers, and runs the Rust solver on 1 thread, requiring byte-identical output.
+
+**Cost of deterministic mode** (4 threads, mean of 2 runs, total wall time):
+
+| model | solver | non-deterministic | deterministic | change |
+|---|---|---:|---:|---:|
+| spine FSU n40, flexion | Rust | 14.8 s | 25.9 s | +76% |
+| spine FSU n40, flexion | PARDISO | 15.5 s | 29.0 s | +87% |
+| biphasic FSU n24 | Rust | 6.7 s | 10.6 s | +58% |
+| hex8 n20, Newton | Rust | 11.3 s | 13.2 s | +17% |
+| hex8 n20, Newton | PARDISO | 12.4 s | 16.5 s | +33% |
+
+The extra time is FEBio's element loops running serially. PARDISO's linear-solve time also rises (e.g. 8.2 → 10.8 s) because of MKL CNR. Recovering this without giving up determinism is OPEN_ITEMS P12.

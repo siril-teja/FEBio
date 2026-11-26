@@ -183,3 +183,75 @@ fn larger_tree_parallel() {
     check_sym(16, 30.0, 4, 1e-11);
     check_unsym(16, 1.0, 30.0, 4, 1e-11);
 }
+
+// ---------------------------------------------------------------------------------------
+// Run-to-run determinism: repeated factor + solve must give bitwise identical solutions.
+// ---------------------------------------------------------------------------------------
+
+fn solve_sym_bits(g: usize, diag: f64, threads: usize) -> Vec<u64> {
+    let (n, rp, ci, v) = stencil(g, 0.0, diag, 7);
+    let (cp, ri, lv) = lower_of(n, &rp, &ci, &v);
+    let mut s = Solver::new(threads);
+    s.analyze_symmetric(n, &cp, &ri, 0).unwrap();
+    s.factor(&lv).unwrap();
+    let b: Vec<f64> = (0..n).map(|i| ((i * 31) % 17) as f64 - 8.0).collect();
+    let mut x = vec![0.0; n];
+    s.solve(&mut x, &b).unwrap();
+    x.iter().map(|v| v.to_bits()).collect()
+}
+
+fn solve_unsym_bits(g: usize, threads: usize) -> Vec<u64> {
+    let (n, rp, ci, v) = stencil(g, 1.0, 30.0, 11);
+    let mut s = Solver::new(threads);
+    s.analyze_unsymmetric(n, &rp, &ci, 0).unwrap();
+    s.factor(&v).unwrap();
+    let b: Vec<f64> = (0..n).map(|i| ((i * 31) % 17) as f64 - 8.0).collect();
+    let mut x = vec![0.0; n];
+    s.solve(&mut x, &b).unwrap();
+    x.iter().map(|v| v.to_bits()).collect()
+}
+
+#[test]
+fn thread_count_independent_results() {
+    // the same bits for 1, 2, 3 and 4 threads
+    let s1 = solve_sym_bits(18, 30.0, 1);
+    let u1 = solve_unsym_bits(16, 1);
+    for t in [2, 3, 4] {
+        let s = solve_sym_bits(18, 30.0, t);
+        let ns = s.iter().zip(&s1).filter(|(a, b)| a != b).count();
+        let u = solve_unsym_bits(16, t);
+        let nu = u.iter().zip(&u1).filter(|(a, b)| a != b).count();
+        assert!(
+            ns == 0 && nu == 0,
+            "{t} threads vs 1: {ns} symmetric / {nu} unsymmetric entries differ"
+        );
+    }
+}
+
+#[test]
+fn deterministic_symmetric_repeated_runs() {
+    // g=18 is large enough that the top of the tree uses parallel dense kernels and
+    // column-block-parallel updates
+    for t in [2, 4] {
+        let r0 = solve_sym_bits(18, 30.0, t);
+        for _ in 0..10 {
+            assert!(
+                solve_sym_bits(18, 30.0, t) == r0,
+                "symmetric solve not reproducible at {t} threads"
+            );
+        }
+    }
+}
+
+#[test]
+fn deterministic_unsymmetric_repeated_runs() {
+    for t in [2, 4] {
+        let r0 = solve_unsym_bits(16, t);
+        for _ in 0..10 {
+            assert!(
+                solve_unsym_bits(16, t) == r0,
+                "unsymmetric solve not reproducible at {t} threads"
+            );
+        }
+    }
+}

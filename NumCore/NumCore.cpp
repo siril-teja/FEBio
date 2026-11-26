@@ -51,11 +51,23 @@ SOFTWARE.*/
 #include "MKLDSSolver.h"
 #include "RustSolver.h"
 #include "numcore_api.h"
+#include <FECore/fecore_threads.h>
+#ifdef PARDISO
+#undef PARDISO
+#include <mkl.h>
+#define PARDISO
+#endif
 
 //=============================================================================
 // Call this to initialize the NumCore module
 NUMCORE_API void NumCore::InitModule()
 {
+#ifdef PARDISO
+	// In deterministic mode, make MKL (PARDISO) bitwise reproducible from run to run
+	// (conditional numerical reproducibility). This must precede any other MKL call.
+	if (FECoreThreads::IsDeterministic()) mkl_cbwr_set(MKL_CBWR_AUTO);
+#endif
+
 	// register linear solvers
 #ifdef PARDISO
 	REGISTER_FECORE_CLASS(PardisoSolver  , "pardiso");

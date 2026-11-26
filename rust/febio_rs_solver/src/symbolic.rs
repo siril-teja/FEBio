@@ -203,6 +203,12 @@ fn order_metis(nv: usize, xadj: &[usize], adj: &[usize], vwgt: &[i32]) -> Vec<us
         m::METIS_SetDefaultOptions(opts.as_mut_ptr());
     }
     opts[m::moptions_et_METIS_OPTION_NUMBERING as usize] = 0;
+    // METIS (GKlib) keeps its random-number generator in global state and reseeds it on
+    // entry, so concurrent calls would interleave random draws and produce different
+    // orderings. Serialize all calls to keep the ordering (and hence the factorization)
+    // bitwise reproducible.
+    static METIS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = METIS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let ret = unsafe {
         m::METIS_NodeND(
             &mut nvtxs,

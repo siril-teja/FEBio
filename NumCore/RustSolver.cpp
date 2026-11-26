@@ -26,6 +26,7 @@ SOFTWARE.*/
 #include "stdafx.h"
 #include "RustSolver.h"
 #include <FECore/log.h>
+#include <FECore/fecore_threads.h>
 #include <stdio.h>
 
 #ifdef RUST_SOLVER
@@ -85,10 +86,10 @@ bool RustSolver::PreProcess()
 	// The Rust solver object survives Destroy() (FEBio calls Destroy + PreProcess whenever it
 	// rebuilds the matrix profile), so it can detect identical / similar sparsity patterns and
 	// reuse its symbolic analysis or ordering.
+	// use the number of threads requested by the user (in deterministic mode FEBio's own
+	// OpenMP loops run single-threaded; the Rust solver is deterministic for any thread count)
 	int nthreads = m_nthreads;
-#ifdef _OPENMP
-	if (nthreads <= 0) nthreads = omp_get_max_threads();
-#endif
+	if (nthreads <= 0) nthreads = FECoreThreads::RequestedThreads();
 	if (m_solver == nullptr)
 	{
 		FrsSolver* s = frs_create(nthreads);

@@ -18,7 +18,6 @@ use faer::linalg::cholesky::ldlt::factor::{
     cholesky_in_place, cholesky_in_place_scratch, LdltParams, LdltRegularization,
 };
 use faer::linalg::matmul::matmul;
-use faer::linalg::matmul::triangular::{matmul as tri_matmul, BlockStructure};
 use faer::linalg::triangular_solve::{
     solve_unit_lower_triangular_in_place, solve_unit_upper_triangular_in_place,
 };
@@ -308,11 +307,13 @@ impl<'a> Ctx<'a> {
                 continue;
             }
             let len1 = hi - lo;
-            let len2 = pd.len() - lo;
+            // rows always start at r0 (not at the block's first column lo): the gemm below then
+            // has the same row alignment however the target columns are split into blocks
+            let nrow = pd.len() - r0;
             let ld = unsafe { panel_ref(base.0, sym.val_ptr[dsn], md, kd) };
             let dd = unsafe { std::slice::from_raw_parts(self.dp.0.add(sym.sn_begin[dsn]), kd) };
             let ld1 = ld.subrows(kd + lo, len1);
-            let ld2 = ld.subrows(kd + lo, len2);
+            let ldr = ld.subrows(kd + r0, nrow);
             // T = Ld1 * D   (len1 x kd)
             t.clear();
             t.resize(len1 * kd, 0.0);
@@ -325,41 +326,24 @@ impl<'a> Ctx<'a> {
                 }
             }
             let tm = MatRef::from_column_major_slice(t, len1, kd);
-            // C = Ld2 * T^T  (len2 x len1), only the lower trapezoid is needed
+            // C = L_d[rows r0..] * T^T  (nrow x len1). One plain gemm: every entry is produced by
+            // the same kernel with the same alignment no matter how the target columns are
+            // split, which keeps the factorization bitwise independent of the thread count.
+            // Only the lower trapezoid (rows >= the target column) is used.
             cbuf.clear();
-            cbuf.resize(len2 * len1, 0.0);
+            cbuf.resize(nrow * len1, 0.0);
             {
-                let mut cm = MatMut::from_column_major_slice_mut(cbuf, len2, len1);
-                let (c_top, c_bot) = cm.rb_mut().split_at_row_mut(len1);
-                tri_matmul(
-                    c_top,
-                    BlockStructure::TriangularLower,
-                    Accum::Replace,
-                    ld1,
-                    BlockStructure::Rectangular,
-                    tm.transpose(),
-                    BlockStructure::Rectangular,
-                    1.0,
-                    par,
-                );
-                if len2 > len1 {
-                    matmul(
-                        c_bot,
-                        Accum::Replace,
-                        ld2.subrows(len1, len2 - len1),
-                        tm.transpose(),
-                        1.0,
-                        par,
-                    );
-                }
+                let cm = MatMut::from_column_major_slice_mut(cbuf, nrow, len1);
+                matmul(cm, Accum::Replace, ldr, tm.transpose(), 1.0, par);
             }
             // scatter-subtract into the panel of s
-            let prow = &pd[lo..];
+            let prow = &pd[r0..];
+            let off = lo - r0;
             for cc in 0..len1 {
-                let tcol = prow[cc] - b;
+                let tcol = prow[off + cc] - b;
                 let dst = &mut raw[tcol * m..(tcol + 1) * m];
-                let src = &cbuf[cc * len2..(cc + 1) * len2];
-                for rr in cc..len2 {
+                let src = &cbuf[cc * nrow..(cc + 1) * nrow];
+                for rr in (off + cc)..nrow {
                     let tr = map[prow[rr]] as usize;
                     dst[tr] -= src[rr];
                 }
@@ -608,9 +592,9 @@ pub fn solve_permuted_par(
     nthreads: usize,
 ) {
     use rayon::prelude::*;
-    if nthreads <= 1 || subtrees.len() <= 1 {
-        return solve_permuted(sym, num, x);
-    }
+    // Always the same (left-looking, chunked) algorithm, also for one thread, so that the
+    // solution is bitwise identical for any thread count.
+    let _ = nthreads;
     let xp = SyncPtr(x.as_mut_ptr());
     let lp = num.l.as_ptr() as usize;
     let n = sym.n;
@@ -641,31 +625,30 @@ pub fn solve_permuted_par(
                 }
             }
         };
-        let acc = if par && upds.len() >= 32 {
-            upds.par_iter()
-                .fold(
-                    || vec![0.0f64; k],
-                    |mut acc, u| {
-                        gather(u, &mut acc);
-                        acc
-                    },
-                )
-                .reduce(
-                    || vec![0.0f64; k],
-                    |mut a, bv| {
-                        for (p, q) in a.iter_mut().zip(&bv) {
-                            *p += q;
-                        }
-                        a
-                    },
-                )
-        } else {
+        // Deterministic gather: the updates are split into fixed-size chunks (independent of
+        // the thread count), each chunk is summed in update order, and the chunk sums are
+        // added in chunk order. The serial and parallel paths perform exactly the same
+        // floating-point operations, so the result is bitwise reproducible.
+        const CHUNK: usize = 32;
+        let nchunks = upds.len().div_ceil(CHUNK);
+        let chunk_sum = |ci: usize| -> Vec<f64> {
             let mut acc = vec![0.0f64; k];
-            for u in upds {
+            for u in &upds[ci * CHUNK..((ci + 1) * CHUNK).min(upds.len())] {
                 gather(u, &mut acc);
             }
             acc
         };
+        let partial: Vec<Vec<f64>> = if par && nchunks > 1 {
+            (0..nchunks).into_par_iter().map(chunk_sum).collect()
+        } else {
+            (0..nchunks).map(chunk_sum).collect()
+        };
+        let mut acc = vec![0.0f64; k];
+        for pc in &partial {
+            for (a, v) in acc.iter_mut().zip(pc) {
+                *a += v;
+            }
+        }
         // SAFETY: x[b..b+k] is owned by supernode s during this call
         let xs = unsafe { std::slice::from_raw_parts_mut(xq.get().add(b), k) };
         for c in 0..k {
