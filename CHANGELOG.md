@@ -12,6 +12,13 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.10] - 2026-11-26
+
+### Performance
+- **Rust solver, LU path:** iterative refinement now runs only while the relative residual is above 1e-10, and stops when a step does not halve it. A step that makes the residual worse is undone.
+  - **Before:** refinement ran whenever the residual was above 1e-12, which is the rounding level for these systems.
+  - **Published Finley 49F L4–L5 hybrid model:** 149 refinement solves were added on top of 97 regular ones. They are now gone. Linear solver time drops from 79.8 s to 46.3 s (PARDISO: 50.2 s), with the same iteration count and a final rotation identical to native FEBio to 12 digits.
+
 ## [0.4.9] - 2026-11-26
 
 ### Performance
