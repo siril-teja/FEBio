@@ -102,6 +102,9 @@ enum Kind {
 /// default pivot perturbation threshold, relative to max|A_ij| (PARDISO's unsymmetric default)
 pub const DEFAULT_PIVOT_EPS: f64 = 1e-13;
 
+/// LU solves are refined while the relative residual is above this (and improving)
+pub const REFINE_TOL: f64 = 1e-10;
+
 pub struct Solver {
     pool: rayon::ThreadPool,
     pub nthreads: usize,
@@ -507,7 +510,12 @@ impl Solver {
         let _ = nt;
         let mut rel = resid(x, &mut r);
         let mut steps = 0;
-        while (steps < forced) || (rel > 1e-12 && steps < max_refine) {
+        // Refine only while the residual is above REFINE_TOL and still improving: below
+        // ~1e-12 the residual is set by rounding and the matrix conditioning, and each extra
+        // step costs a full solve (on BFGS-heavy models that was 2.5x the solve work).
+        let mut prev = f64::INFINITY;
+        while (steps < forced) || (rel > REFINE_TOL && rel < 0.5 * prev && steps < max_refine) {
+            prev = rel;
             solve_once(&r, &mut dx, &mut w);
             for i in 0..n {
                 x[i] += dx[i];
@@ -515,6 +523,14 @@ impl Solver {
             steps += 1;
             self.stats.n_refine += 1;
             rel = resid(x, &mut r);
+            if rel > prev && steps > forced {
+                // the step made it worse (rounding level reached): undo it and stop
+                for i in 0..n {
+                    x[i] -= dx[i];
+                }
+                rel = resid(x, &mut r);
+                break;
+            }
         }
         if std::env::var_os("FRS_PROFILE").is_some() {
             eprintln!("febio_rs_solver: LU solve rel residual {rel:.2e} after {steps} refinement steps, perturbed pivots {}", numr.n_perturbed);
