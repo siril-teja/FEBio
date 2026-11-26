@@ -12,6 +12,12 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.4.9] - 2026-11-26
+
+### Performance
+- **Pipelined ordered assembly:** while one thread adds a chunk of element matrices/vectors to the global system in element order, the other threads compute the next chunk. Element buffers are reused across calls. Output is byte-identical. Stiffness evaluation is about 10% faster on the Finley 59F L4–L5 model at 4 threads; end to end, the difference is within run-to-run noise.
+- **Rigid-body coupling:** elements without rigid nodes skip the rigid-body coupling, which saves two heap allocations per element and assembly.
+
 ## [0.4.8] - 2026-11-26
 
 ### Documentation
