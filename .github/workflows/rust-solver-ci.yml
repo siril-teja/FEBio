@@ -51,7 +51,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: System packages
-        run: sudo apt-get update -q && sudo apt-get install -y -q cmake build-essential zlib1g-dev python3-venv
+        # Only Ubuntu archives are needed. Drop the runner image's third-party apt
+        # sources (e.g. packages.microsoft.com), whose outages fail `apt-get update`.
+        run: |
+          grep -rlE 'packages\.microsoft\.com' /etc/apt/sources.list.d/ 2>/dev/null | xargs -r sudo rm -f || true
+          sudo apt-get update -q
+          sudo apt-get install -y -q cmake build-essential zlib1g-dev python3-venv
       - name: Toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: actions/cache@v4
