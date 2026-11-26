@@ -36,7 +36,11 @@ int febio::Hello(LogStream& log)
 {
 	char szversion[128] = { 0 };
 	char* szvernum = getVersionString();
+#ifdef FEBIO_RUST_VERSION
+	snprintf(szversion, sizeof(szversion), "  FEBio-Rust %s (based on FEBio %s)\n", FEBIO_RUST_VERSION, szvernum);
+#else
 	snprintf(szversion, sizeof(szversion), "  version %s\n", szvernum);
+#endif
 	
 	log.print("===========================================================================\n");
 	log.print("         ________    _________   _______       __     _________            \n");
