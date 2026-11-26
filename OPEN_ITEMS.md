@@ -1,5 +1,7 @@
 # Open items: Rust solver and FEBio performance work
 
+Technical backlog behind [`ROADMAP.md`](ROADMAP.md). The roadmap sets the order, one item per pull request.
+
 Status as of 2026-11-26 (`main`). Background and results: `rust/README.md`, `rust/BENCHMARKS.md`.
 
 ## Validation / models

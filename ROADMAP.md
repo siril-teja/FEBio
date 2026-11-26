@@ -1,34 +1,88 @@
-# Roadmap
+# FEBio-Rust Roadmap
 
-This roadmap briefly discusses some planned milestones for the FEBio project. 
+## Objective
 
-Please check out our [contribution guidelines](CONTRIBUTING.md) and [code of conduct](CODE_OF_CONDUCT.md) for information on how to contribute to the FEBio project.
+Build an open-source nonlinear FE solver for spine biomechanics that is as fast as possible on bare-metal multicore machines. It must not give up accuracy or reproducibility to get there.
 
-## Main Milestones
+## Targets
 
-The main focus at this point is the implementation of the main aims of the NIH RO1 grant that funds FEBio development. The estimated completion date for these milestones is summer of 2023, although some functionality may be available sooner.
+| | Target | Measured on |
+|---|---|---|
+| Speed | ≥ 5× faster end to end than upstream FEBio 4.13 + PARDISO | Finley et al. 2018 L4–L5 and L1–L5 models, 32+ cores |
+| Accuracy | Same iteration counts; displacements and range of motion within 1e-9 (relative) of upstream FEBio | same models |
+| Determinism | Byte-identical output for every run and every thread count | CI gate |
+| Build | One `cargo build`, no vendor libraries | Linux, macOS, Windows |
+| Use | Python API for scripting, parameter studies and calibration | — |
 
-### Formulate and implement a computationally efficient damage and fatigue failure framework for fibrous tissues. 
+Completing every item below should reach these targets.
 
-This aim focuses on the development and implementation of a novel theoretical framework for modeling damage and fatigue failure mechanics. This work will extend the remodeling and growth framework already implemented in FEBio to include damage and failure of soft tissues. 
+## How we work
 
-### Expand the multiphysics capabilities of FEBio to include solute transport, reactions involving solutes, and tissue growth and remodeling in fluid domains at their interfaces. 
+- **One item = one pull request** into `main`, gated by CI: the regression check, the determinism check and the version and changelog policy.
+- **Every speed item comes with benchmark numbers** and leaves the output unchanged.
+- **Until the Rust core is complete, C++ FEBio is the reference:** every Rust-core item must match it.
 
-In this aim, the multiphisics capabilities of FEBio will be extended to include various transport and reaction modeling capabilites at solid-fluid boundaries. 
+Status: ✅ done · 🔄 in progress · ⬜ planned
 
-### Integrate the use of image data through the entire simulation pipeline, from model setup to model validation. 
+## Phase 1 — Fast linear solver and reproducible runs (done)
 
-This aim proposes to include image data throughout the entire modeling pipeline, from pre-processing to post-processing. Most of this development will actually occur in FEBio Studio, but the focus in FEBio is the representation of heterogeneous model parameters (e.g. material parameters) that are extracted from image data. 
+| # | Item | Status |
+|---|---|---|
+| 1.1 | Parallel sparse direct solver in Rust (LDLᵀ / LU) | ✅ |
+| 1.2 | CI gate: PARDISO vs Rust regression | ✅ |
+| 1.3 | Bitwise-reproducible runs by default | ✅ #4 |
+| 1.4 | PARDISO symbolic reuse | ✅ #5 |
+| 1.5 | Versioning and PR policy | ✅ #7 |
+| 1.6 | Fiber-direction memoization | ✅ #6 |
+| 1.7 | Deterministic parallel element loops (solid, biphasic) | ✅ #8 |
+| 1.8 | OpenMP idle threads sleep during the Rust solve | ✅ #9 |
 
-## Long term milestones
+## Phase 2 — Real models and baseline
 
-The following topics are currently under consideration as potential milestones, depending on user interest and feasibility. 
+| # | Item | Status |
+|---|---|---|
+| 2.1 | Finley 2018 lumbar models in `models/` + benchmark driver | 🔄 |
+| 2.2 | Trim to the solid mechanics we need (drop fluid, FSI, RVE, optimization) | 🔄 #11 |
+| 2.3 | CI smoke test on a published FSU model | ⬜ |
+| 2.4 | Scaling study, 4–64 cores and NUMA | ⬜ |
+| 2.5 | Python driver for the `febio4` executable (run, parse log and plot files) | ⬜ |
 
-### topology optimization
+## Phase 3 — Remove remaining bottlenecks in the C++ host
 
-FEBio already has optimization algorithms for optimizing model parameters while preserving the geometry. In this milestone we would look into extending this framework to allow for topology changes. 
+| # | Item | Status |
+|---|---|---|
+| 3.1 | Cheaper restart snapshot per time step | ⬜ |
+| 3.2 | Reuse the stiffness sparsity pattern across time steps | ⬜ |
+| 3.3 | Type-tag material point lookup (no `dynamic_cast`) | ⬜ |
+| 3.4 | Deterministic parallel contact | ⬜ |
+| 3.5 | Deterministic parallel springs, rigid bodies and surface loads | ⬜ |
+| 3.6 | Faster contact search (spatial index) | ⬜ |
+| 3.7 | Parallel triangular solve | ⬜ |
+| 3.8 | Top-of-tree parallel factorization | ⬜ |
+| 3.9 | Portable release builds (runtime CPU dispatch) | ⬜ |
 
-### Integration with the Julia programming language. 
+## Phase 4 — Rust FE core
 
-The Julia programming language appears to be an interesting potential path for extending FEBio's capabilities through scripting, or as a mechanism for integrating FEBio with other tools. 
+| # | Item | Status |
+|---|---|---|
+| 4.1 | Core: mesh, degrees of freedom, assembly, Newton/BFGS, time stepping | ⬜ |
+| 4.2 | `.feb` reader (2.5 / 4.0) | ⬜ |
+| 4.3 | Elements: hex8, tet4, tet10 | ⬜ |
+| 4.4 | Materials: neo-Hookean, orthotropic elastic | ⬜ |
+| 4.5 | Materials: Holmes–Mow + fiber-exp-pow mixtures, local axes | ⬜ |
+| 4.6 | Rigid bodies, nonlinear springs, pressure loads | ⬜ |
+| 4.7 | Sliding-elastic contact | ⬜ |
+| 4.8 | `sliding2` contact | ⬜ |
+| 4.9 | Log and `.xplt` output (FEBio Studio compatible) | ⬜ |
+| 4.10 | Python bindings (PyO3, NumPy arrays) | ⬜ |
+| 4.11 | Gate: Finley models match C++ FEBio | ⬜ |
 
+## Phase 5 — Beyond the C++ baseline
+
+| # | Item | Status |
+|---|---|---|
+| 5.1 | SIMD and batched element kernels | ⬜ |
+| 5.2 | NUMA-aware memory and thread placement | ⬜ |
+| 5.3 | Parallel load cases and parameter sweeps from Python | ⬜ |
+| 5.4 | Rust core becomes the default; C++ kept as reference only | ⬜ |
+| 5.5 | Target check: ≥ 5× on 32+ cores, accuracy and determinism held | ⬜ |

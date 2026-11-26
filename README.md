@@ -91,7 +91,7 @@ Material updates and the solid/biphasic element loops still run in parallel in d
 
 ## Status and limitations
 
-See [`OPEN_ITEMS.md`](OPEN_ITEMS.md). In short:
+The plan is in [`ROADMAP.md`](ROADMAP.md): each item is one pull request. Known limitations and the technical backlog are in [`OPEN_ITEMS.md`](OPEN_ITEMS.md). In short:
 - The published FEBio lumbar spine models (Finley et al. 2018) are not yet in the benchmark set.
 - Saddle-point formulations (Lagrange-multiplier contact, mixed u–p) are not yet validated.
 - Scaling was only measured up to 4 cores.
