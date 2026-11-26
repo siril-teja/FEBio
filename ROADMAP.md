@@ -41,7 +41,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 
 | # | Item | Status |
 |---|---|---|
-| 2.1 | Finley 2018 lumbar models in `models/` + benchmark driver | 🔄 |
+| 2.1 | Finley 2018 lumbar models in `models/` + benchmark driver | ✅ |
 | 2.2 | Trim to the solid mechanics we need (drop fluid, FSI, RVE, optimization) | 🔄 #11 |
 | 2.3 | CI smoke test on a published FSU model | ⬜ |
 | 2.4 | Scaling study, 4–64 cores and NUMA | ⬜ |
