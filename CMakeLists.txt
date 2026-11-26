@@ -462,6 +462,12 @@ target_include_directories(numcore PRIVATE ${EXTRA_INC})
 target_include_directories(feamr PRIVATE ${EXTRA_INC})
 target_include_directories(febiolib PRIVATE ${EXTRA_INC})
 
+# FEBio-Rust version (VERSION file, bumped by every pull request; see CHANGELOG.md)
+file(READ "${PROJECT_SOURCE_DIR}/VERSION" FEBIO_RUST_VERSION)
+string(STRIP "${FEBIO_RUST_VERSION}" FEBIO_RUST_VERSION)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/VERSION")
+target_compile_definitions(febiolib PRIVATE "FEBIO_RUST_VERSION=\"${FEBIO_RUST_VERSION}\"")
+
 # Extra Libs
 target_link_libraries(numcore PRIVATE ${EXTRA_LIB})
 

@@ -1,5 +1,7 @@
 # FEBio-Rust
 
+Version: see [`VERSION`](VERSION) and [`CHANGELOG.md`](CHANGELOG.md). It is also shown in the `febio4` start-up banner.
+
 FEBio-Rust is a fork of [FEBio](https://github.com/febiosoftware/FEBio), the nonlinear finite element solver for biomechanics. It keeps FEBio's input format, materials and physics, and adds a **parallel sparse direct linear solver written in Rust**. The focus is faster spine and soft-tissue models with **bitwise-reproducible results**.
 
 ## What is different from FEBio
@@ -70,8 +72,15 @@ Deterministic mode currently costs 17–90% wall time, because FEBio's element l
 ## Development workflow
 
 1. Branch from `main`, one change (one speed improvement) per branch.
-2. Open a pull request into `main`.
-3. CI (`.github/workflows/rust-solver-ci.yml`) must pass:
+2. Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages and the PR title, e.g. `perf(pardiso): …`, `feat(solver): …`, `fix: …`. No AI attribution in titles, descriptions or commits.
+3. Bump `VERSION` in the PR (and the version in `rust/febio_rs_solver/Cargo.toml`), and add a `CHANGELOG.md` entry:
+   - `feat` → minor;
+   - breaking (`!`) → major;
+   - anything else → patch.
+4. Open a pull request into `main`. It is squash-merged as one conventional commit.
+5. CI must pass:
+   - `pr-policy.yml`: conventional title and commits, no AI attribution, correct version bump, changelog entry;
+   - `rust-solver-ci.yml`, as follows:
    - `cargo fmt`, `clippy` and the Rust tests;
    - an FEBio build with MKL and the Rust solver;
    - the regression gate: each model is run with PARDISO and with the Rust solver, and must produce identical iteration counts and displacements within 1e-9;

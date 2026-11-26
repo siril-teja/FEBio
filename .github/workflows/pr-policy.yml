@@ -1,0 +1,22 @@
+name: PR policy
+
+# Conventional-commit titles and commits, no AI attribution, version bump and changelog
+# entry for every pull request into main. Re-runs when the title/description is edited.
+on:
+  pull_request:
+    branches: ['main']
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: PR policy (conventional commits, version bump, changelog, no AI attribution)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check
+        run: python3 ci/pr_policy.py
