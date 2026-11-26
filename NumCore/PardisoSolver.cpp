@@ -101,6 +101,7 @@ PardisoSolver::PardisoSolver(FEModel* fem) : LinearSolver(fem), m_pA(0)
 	m_mtype = -2;
 	m_iparm3 = false;
 	m_isFactored = false;
+	m_isAnalyzed = false;
 	m_msglvl = 0; /* 0 Suppress printing, 1 Print statistical information */
 }
 
@@ -158,6 +159,7 @@ bool PardisoSolver::PreProcess()
 
 	//fprintf(stderr, "In PreProcess\n");
 	assert(m_isFactored == false);
+	m_isAnalyzed = false;
 	pardisoinit(m_pt, &m_mtype, m_iparm);
 
 	// For saddle-point systems, disable nonsymmetric scaling/matching; 
@@ -204,17 +206,23 @@ bool PardisoSolver::Factor()
 // that is necessary for the factorization.
 // ------------------------------------------------------------------------------
 
+	// The sparsity pattern only changes through PreProcess (FEBio calls Destroy + PreProcess
+	// whenever it rebuilds the matrix profile), so the reordering and symbolic factorization
+	// only need to be done on the first Factor() after PreProcess.
 	int phase = 11;
-
 	int error = 0;
-	pardiso(m_pt, &m_maxfct, &m_mnum, &m_mtype, &phase, &m_n, m_pA->Values(), m_pA->Pointers(), m_pA->Indices(),
-		 NULL, &m_nrhs, m_iparm, &m_msglvl, NULL, NULL, &error);
-
-	if (error)
+	if (m_isAnalyzed == false)
 	{
-		fprintf(stderr, "\nERROR during symbolic factorization: ");
-		print_err(error);
-		exit(2);
+		pardiso(m_pt, &m_maxfct, &m_mnum, &m_mtype, &phase, &m_n, m_pA->Values(), m_pA->Pointers(), m_pA->Indices(),
+			 NULL, &m_nrhs, m_iparm, &m_msglvl, NULL, NULL, &error);
+
+		if (error)
+		{
+			fprintf(stderr, "\nERROR during symbolic factorization: ");
+			print_err(error);
+			exit(2);
+		}
+		m_isAnalyzed = true;
 	}
 
 	if (m_msglvl == 1)
@@ -372,6 +380,7 @@ void PardisoSolver::Destroy()
 			NULL, &m_nrhs, m_iparm, &m_msglvl, NULL, NULL, &error);
 	}
 	m_isFactored = false;
+	m_isAnalyzed = false;
 }
 #else 
 BEGIN_FECORE_CLASS(PardisoSolver, LinearSolver)
