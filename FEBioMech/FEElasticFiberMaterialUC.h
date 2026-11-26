@@ -40,6 +40,9 @@ public:
 	// Get the fiber direction (in global coordinates) at a material point
 	vec3d FiberVector(FEMaterialPoint& mp);
 
+	// determines whether the fiber direction can be cached per material point
+	bool Init() override;
+
 	// calculate stress in fiber direction a0
 	virtual mat3ds DevFiberStress(FEMaterialPoint& mp, const vec3d& a0) = 0;
 
@@ -69,6 +72,10 @@ private:
 public:
 	
 	FEVec3dValuator*	m_fiber;	//!< fiber orientation
+
+private:
+	bool	m_cacheFiber = false;	//!< fiber direction is reference-invariant -> cache it
+public:
 
 	double	m_epsf;
 
