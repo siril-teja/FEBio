@@ -27,13 +27,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: rustup toolchain install stable --profile minimal -c rustfmt,clippy && rustup default stable
+      # Only the crate sources are cached: build artifacts are compiled with
+      # -C target-cpu=native and must not be reused on a runner with a different CPU
+      # (that caused SIGILL in the tests).
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/febio_rs_solver/target
-          key: cargo-${{ runner.os }}-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}
+          key: cargo-reg-${{ runner.os }}-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}
       - name: Format
         run: cargo fmt --check
       - name: Clippy (correctness and suspicious lints are errors)

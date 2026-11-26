@@ -31,3 +31,6 @@ First versioned release of FEBio-Rust. It covers everything merged so far.
 
 ### Changed
 - PARDISO: reordering and symbolic factorization run once per sparsity pattern instead of at every reformation: −23 to −25% on Newton runs without contact (#5).
+
+### Fixed
+- CI no longer caches Rust build artifacts across runners. They are compiled for the runner's CPU (`-C target-cpu=native`), and reusing them on another CPU crashed the tests with SIGILL.
