@@ -46,6 +46,7 @@ def main():
     ap.add_argument("--out", default="spine_results.json")
     ap.add_argument("--solvers", default="pardiso,rust")
     a = ap.parse_args()
+    a.febio = os.path.abspath(a.febio)  # runs use the model directory as cwd
     os.makedirs(a.workdir, exist_ok=True)
     res = json.load(open(a.out)) if os.path.exists(a.out) else []
     for name, mode, n, nz, bp, threads in CASES:

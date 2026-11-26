@@ -62,6 +62,7 @@ def main():
     ap.add_argument("--out", default="results.json")
     ap.add_argument("--solvers", default="all", help="comma list to (re)run, e.g. rust")
     a = ap.parse_args()
+    a.febio = os.path.abspath(a.febio)  # runs use the model directory as cwd
     os.makedirs(a.workdir, exist_ok=True)
     # (name, generator args, solvers, threads)
     cases = [
