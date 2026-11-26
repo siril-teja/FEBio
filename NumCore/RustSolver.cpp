@@ -48,7 +48,7 @@ RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symme
 	m_nthreads = 0;
 	m_ordering = 0;
 	m_refine = 0;
-	m_pivotEps = 1e-8;
+	m_pivotEps = 0.0;
 	m_printLevel = 0;
 }
 
@@ -93,7 +93,7 @@ bool RustSolver::PreProcess()
 	FrsSolver* s = frs_create(nthreads);
 	m_solver = s;
 	frs_set_option(s, FRS_OPT_ORDERING, m_ordering);
-	frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);
+	if (m_pivotEps > 0) frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);	// 0 = solver default (as PARDISO: 1e-8 LDLT, 1e-13 LU)
 	frs_set_option(s, FRS_OPT_REFINE, m_refine);
 
 	int n = m_pA->Rows();

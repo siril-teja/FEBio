@@ -10,10 +10,10 @@
 //!     A -> panel scatter maps, supernodal tree, and the per-supernode list of
 //!     descendant supernodes that update it (left-looking).
 
+use faer::dyn_stack::{MemBuffer, MemStack, StackReq};
 use faer::sparse::linalg::cholesky::{simplicial, supernodal};
 use faer::sparse::linalg::SymbolicSupernodalParams;
 use faer::sparse::SymbolicSparseColMatRef;
-use faer::dyn_stack::{MemBuffer, MemStack, StackReq};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ordering {
@@ -143,13 +143,33 @@ fn supervariables(n: usize, xadj: &[usize], adj: &[usize]) -> Vec<usize> {
         let mut sa = false;
         let mut sb = false;
         loop {
-            let va = if !sa && (ia >= pa.len() || a < pa[ia]) { Some(a) } else if ia < pa.len() { Some(pa[ia]) } else { None };
-            let vb = if !sb && (ib >= pb.len() || b < pb[ib]) { Some(b) } else if ib < pb.len() { Some(pb[ib]) } else { None };
+            let va = if !sa && (ia >= pa.len() || a < pa[ia]) {
+                Some(a)
+            } else if ia < pa.len() {
+                Some(pa[ia])
+            } else {
+                None
+            };
+            let vb = if !sb && (ib >= pb.len() || b < pb[ib]) {
+                Some(b)
+            } else if ib < pb.len() {
+                Some(pb[ib])
+            } else {
+                None
+            };
             match (va, vb) {
                 (None, None) => return true,
                 (Some(x), Some(y)) if x == y => {
-                    if !sa && x == a { sa = true } else { ia += 1 }
-                    if !sb && y == b { sb = true } else { ib += 1 }
+                    if !sa && x == a {
+                        sa = true
+                    } else {
+                        ia += 1
+                    }
+                    if !sb && y == b {
+                        sb = true
+                    } else {
+                        ib += 1
+                    }
                 }
                 _ => return false,
             }
@@ -211,7 +231,13 @@ fn order_amd(nv: usize, xadj: &[usize], adj: &[usize]) -> Vec<usize> {
     let a = SymbolicSparseColMatRef::new_checked(nv, nv, xadj, None, adj);
     let req = amd::order_scratch::<usize>(nv, adj.len());
     let mut mem = MemBuffer::new(req);
-    match amd::order(&mut fwd, &mut inv, a, Default::default(), MemStack::new(&mut mem)) {
+    match amd::order(
+        &mut fwd,
+        &mut inv,
+        a,
+        Default::default(),
+        MemStack::new(&mut mem),
+    ) {
         Ok(_) => fwd, // perm_fwd: new -> old? (faer: fwd[i] = old index at new position i)
         Err(_) => (0..nv).collect(),
     }
@@ -338,7 +364,12 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
         let req = simplicial::prefactorize_symbolic_cholesky_scratch::<usize>(n, ri.len());
         let mut mem = MemBuffer::new(req);
         let au = SymbolicSparseColMatRef::new_checked(n, n, &cp, None, &ri);
-        simplicial::prefactorize_symbolic_cholesky::<usize>(&mut etree, &mut cc, au, MemStack::new(&mut mem));
+        simplicial::prefactorize_symbolic_cholesky::<usize>(
+            &mut etree,
+            &mut cc,
+            au,
+            MemStack::new(&mut mem),
+        );
     }
     let post = etree_postorder(&etree);
     let perm: Vec<usize> = post.iter().map(|&p| perm0[p]).collect();
@@ -351,7 +382,12 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
         let req = simplicial::prefactorize_symbolic_cholesky_scratch::<usize>(n, ri.len());
         let mut mem = MemBuffer::new(req);
         let au = SymbolicSparseColMatRef::new_checked(n, n, &cp, None, &ri);
-        simplicial::prefactorize_symbolic_cholesky::<usize>(&mut etree, &mut cc, au, MemStack::new(&mut mem));
+        simplicial::prefactorize_symbolic_cholesky::<usize>(
+            &mut etree,
+            &mut cc,
+            au,
+            MemStack::new(&mut mem),
+        );
     }
     let sym = {
         let req = StackReq::any_of(&[
@@ -528,7 +564,11 @@ pub fn analyze(a: &LowerCsc, ordering: Ordering) -> Result<Symbolic, String> {
             while r < p.len() && p[r] < e {
                 r += 1;
             }
-            upd[upos[s]] = Update { d: d as u32, r0: r0 as u32, r1: r as u32 };
+            upd[upos[s]] = Update {
+                d: d as u32,
+                r0: r0 as u32,
+                r1: r as u32,
+            };
             upos[s] += 1;
         }
     }

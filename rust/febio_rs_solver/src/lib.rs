@@ -3,10 +3,13 @@
 //! * symmetric (indefinite allowed) matrices: supernodal LDL^T with METIS nested
 //!   dissection ordering, tree + dense-kernel parallelism, PARDISO-style pivot
 //!   perturbation and optional iterative refinement.
-//! * unsymmetric matrices: faer's supernodal sparse LU (partial pivoting).
+//! * unsymmetric (structurally symmetric) matrices: supernodal LU with static pivoting,
+//!   pivot perturbation, residual-checked iterative refinement and a partial-pivoting
+//!   sparse LU (faer) as automatic fallback.
 //!
 //! C ABI (see `febio_rs_solver.h`).
 
+pub mod lu;
 pub mod numeric;
 pub mod symbolic;
 
@@ -28,11 +31,27 @@ pub struct Stats {
     pub n_solve: usize,
     pub n_perturbed: usize,
     pub n_refine: usize,
+    pub n_fallback: usize,
 }
 
 impl Default for Stats {
     fn default() -> Self {
-        Stats { n: 0, nnz_a: 0, nnz_l: 0, n_supernodes: 0, n_supervars: 0, flops: 0.0, t_analyze: 0.0, t_factor: 0.0, t_solve: 0.0, n_factor: 0, n_solve: 0, n_perturbed: 0, n_refine: 0 }
+        Stats {
+            n: 0,
+            nnz_a: 0,
+            nnz_l: 0,
+            n_supernodes: 0,
+            n_supervars: 0,
+            flops: 0.0,
+            t_analyze: 0.0,
+            t_factor: 0.0,
+            t_solve: 0.0,
+            n_factor: 0,
+            n_solve: 0,
+            n_perturbed: 0,
+            n_refine: 0,
+            n_fallback: 0,
+        }
     }
 }
 
@@ -48,11 +67,19 @@ enum Kind {
     },
     Unsymmetric {
         n: usize,
-        // matrix stored as CSC of A^T (= CSR of A)
-        colptr: Vec<usize>,
-        rowidx: Vec<usize>,
-        lu: Option<faer::sparse::linalg::solvers::Lu<usize, f64>>,
-        slu: faer::sparse::linalg::solvers::SymbolicLu<usize>,
+        // CSR of A (sorted column indices) == CSC of A^T
+        rowptr: Vec<usize>,
+        colidx: Vec<usize>,
+        /// map from FEBio's value order to the sorted order
+        vorder: Vec<usize>,
+        vals: Vec<f64>,
+        sym: symbolic::Symbolic,
+        lsym: lu::LuSymbolic,
+        sched: (Vec<usize>, Vec<usize>),
+        num: Option<lu::LuNumeric>,
+        /// partial-pivoting fallback (used when static pivoting is not accurate enough)
+        fallback: Option<faer::sparse::linalg::solvers::Lu<usize, f64>>,
+        use_fallback: bool,
     },
 }
 
@@ -61,6 +88,8 @@ pub struct Solver {
     pub nthreads: usize,
     pub ordering: Ordering,
     pub pivot_eps: f64,
+    /// pivot_eps was set explicitly (otherwise LU uses 1e-13, LDL^T 1e-8, as PARDISO)
+    pub pivot_eps_set: bool,
     pub par_flops: f64,
     /// 0: refine only if pivots were perturbed (max `max_refine` steps); n>0: always n steps
     pub refine_mode: i32,
@@ -72,16 +101,22 @@ pub struct Solver {
 impl Solver {
     pub fn new(nthreads: usize) -> Solver {
         let nthreads = if nthreads == 0 {
-            std::thread::available_parallelism().map(|v| v.get()).unwrap_or(1)
+            std::thread::available_parallelism()
+                .map(|v| v.get())
+                .unwrap_or(1)
         } else {
             nthreads
         };
-        let pool = rayon::ThreadPoolBuilder::new().num_threads(nthreads).build().expect("thread pool");
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(nthreads)
+            .build()
+            .expect("thread pool");
         Solver {
             pool,
             nthreads,
             ordering: Ordering::Metis,
             pivot_eps: 1e-8,
+            pivot_eps_set: false,
             par_flops: 4.0e6,
             refine_mode: 0,
             max_refine: 2,
@@ -98,7 +133,13 @@ impl Solver {
     }
 
     /// Symmetric matrix, lower triangle in CSC (equivalently upper triangle in CSR), 0- or 1-based.
-    pub fn analyze_symmetric(&mut self, n: usize, colptr: &[i32], rowidx: &[i32], offset: i32) -> Result<(), String> {
+    pub fn analyze_symmetric(
+        &mut self,
+        n: usize,
+        colptr: &[i32],
+        rowidx: &[i32],
+        offset: i32,
+    ) -> Result<(), String> {
         let t0 = Instant::now();
         let (cp, ri) = to_usize(n, colptr, rowidx, offset)?;
         // validate: lower triangle
@@ -111,7 +152,11 @@ impl Solver {
         }
         let ordering = self.ordering;
         let sym = self.pool.install(|| {
-            let a = symbolic::LowerCsc { n, colptr: &cp, rowidx: &ri };
+            let a = symbolic::LowerCsc {
+                n,
+                colptr: &cp,
+                rowidx: &ri,
+            };
             symbolic::analyze(&a, ordering)
         })?;
         self.stats = Stats::default();
@@ -122,40 +167,96 @@ impl Solver {
         self.stats.n_supervars = sym.n_supervars;
         self.stats.flops = sym.flops;
         let sched = numeric::schedule(&sym, self.nthreads);
-        self.kind = Kind::Symmetric { colptr: cp, rowidx: ri, sym, sched, num: None, vals: Vec::new() };
+        self.kind = Kind::Symmetric {
+            colptr: cp,
+            rowidx: ri,
+            sym,
+            sched,
+            num: None,
+            vals: Vec::new(),
+        };
         self.stats.t_analyze += t0.elapsed().as_secs_f64();
         Ok(())
     }
 
-    /// General matrix in CSR (row pointers / column indices), 0- or 1-based.
-    pub fn analyze_unsymmetric(&mut self, n: usize, rowptr: &[i32], colidx: &[i32], offset: i32) -> Result<(), String> {
-        use faer::sparse::linalg::solvers::SymbolicLu;
-        use faer::sparse::SymbolicSparseColMatRef;
+    /// General (structurally symmetric or not) matrix in CSR, 0- or 1-based.
+    pub fn analyze_unsymmetric(
+        &mut self,
+        n: usize,
+        rowptr: &[i32],
+        colidx: &[i32],
+        offset: i32,
+    ) -> Result<(), String> {
         let t0 = Instant::now();
-        let (cp, ri) = to_usize(n, rowptr, colidx, offset)?;
-        // faer wants sorted indices per column
-        let mut ri = ri;
-        for j in 0..n {
-            ri[cp[j]..cp[j + 1]].sort_unstable();
+        let (rp, ci0) = to_usize(n, rowptr, colidx, offset)?;
+        // sort column indices per row, remembering the value permutation
+        let mut ci = vec![0usize; ci0.len()];
+        let mut vorder = vec![0usize; ci0.len()];
+        for r in 0..n {
+            let mut idx: Vec<usize> = (rp[r]..rp[r + 1]).collect();
+            idx.sort_unstable_by_key(|&t| ci0[t]);
+            for (q, &t) in idx.iter().enumerate() {
+                ci[rp[r] + q] = ci0[t];
+                vorder[rp[r] + q] = t;
+            }
         }
-        let slu = {
-            let a = SymbolicSparseColMatRef::new_checked(n, n, &cp, None, &ri);
-            self.pool.install(|| SymbolicLu::try_new(a)).map_err(|e| format!("symbolic LU: {e:?}"))?
-        };
+        let ordering = self.ordering;
+        let (sym, lsym) = self.pool.install(|| -> Result<_, String> {
+            let (lcp, lri) = lu::symmetrized_lower(n, &rp, &ci);
+            let a = symbolic::LowerCsc {
+                n,
+                colptr: &lcp,
+                rowidx: &lri,
+            };
+            let sym = symbolic::analyze(&a, ordering)?;
+            let lsym = lu::analyze(&sym, &rp, &ci)?;
+            Ok((sym, lsym))
+        })?;
         self.stats = Stats::default();
         self.stats.n = n;
-        self.stats.nnz_a = ri.len();
-        self.kind = Kind::Unsymmetric { n, colptr: cp, rowidx: ri, lu: None, slu };
+        self.stats.nnz_a = ci.len();
+        self.stats.nnz_l = 2 * sym.nnz_l;
+        self.stats.n_supernodes = sym.ns;
+        self.stats.n_supervars = sym.n_supervars;
+        self.stats.flops = 2.0 * sym.flops;
+        let sched = numeric::schedule(&sym, self.nthreads);
+        let use_fallback = std::env::var("FRS_UNSYM")
+            .map(|v| v == "faer")
+            .unwrap_or(false);
+        self.kind = Kind::Unsymmetric {
+            n,
+            rowptr: rp,
+            colidx: ci,
+            vorder,
+            vals: Vec::new(),
+            sym,
+            lsym,
+            sched,
+            num: None,
+            fallback: None,
+            use_fallback,
+        };
         self.stats.t_analyze += t0.elapsed().as_secs_f64();
         Ok(())
     }
 
     pub fn factor(&mut self, vals: &[f64]) -> Result<(), String> {
         let t0 = Instant::now();
-        let opt = numeric::FactorOptions { nthreads: self.nthreads, pivot_eps: self.pivot_eps, par_flops: self.par_flops };
+        let opt = numeric::FactorOptions {
+            nthreads: self.nthreads,
+            pivot_eps: self.pivot_eps,
+            par_flops: self.par_flops,
+        };
         match &mut self.kind {
             Kind::None => return Err("factor called before analyze".into()),
-            Kind::Symmetric { colptr, rowidx, sym, sched, num, vals: v } => {
+            Kind::Symmetric {
+                colptr,
+                rowidx,
+                sym,
+                sched,
+                num,
+                vals: v,
+            } => {
                 if vals.len() != rowidx.len() {
                     return Err("value array has wrong length".into());
                 }
@@ -165,21 +266,48 @@ impl Solver {
                     dump_lower(&path, colptr, rowidx, vals);
                 }
                 let old = num.take();
-                let r = self.pool.install(|| numeric::factor(sym, vals, &opt, old, sched))?;
+                let r = self
+                    .pool
+                    .install(|| numeric::factor(sym, vals, &opt, old, sched))?;
                 self.stats.n_perturbed = r.n_perturbed;
                 *num = Some(r);
             }
-            Kind::Unsymmetric { n, colptr, rowidx, lu, slu } => {
-                use faer::sparse::linalg::solvers::Lu;
-                use faer::sparse::{SparseColMatRef, SymbolicSparseColMatRef};
-                // the stored matrix is A^T in CSC; fix reordering of values matching sorted indices
-                let s = SymbolicSparseColMatRef::new_checked(*n, *n, colptr, None, rowidx);
-                if vals.len() != rowidx.len() {
+            Kind::Unsymmetric {
+                n,
+                rowptr,
+                colidx,
+                vorder,
+                vals: v,
+                sym,
+                lsym,
+                sched,
+                num,
+                fallback,
+                use_fallback,
+            } => {
+                if vals.len() != colidx.len() {
                     return Err("value array has wrong length".into());
                 }
-                let a = SparseColMatRef::new(s, vals);
-                let r = self.pool.install(|| Lu::try_new_with_symbolic(slu.clone(), a)).map_err(|e| format!("LU: {e:?}"))?;
-                *lu = Some(r);
+                v.clear();
+                v.extend(vorder.iter().map(|&t| vals[t]));
+                *fallback = None;
+                if *use_fallback {
+                    *fallback = Some(self.pool.install(|| faer_lu(*n, rowptr, colidx, v))?);
+                } else {
+                    let old = num.take();
+                    let nt = self.nthreads;
+                    // PARDISO's default perturbation for unsymmetric matrices is 1e-13 (iparm[9]=13)
+                    let eps = if self.pivot_eps_set {
+                        opt.pivot_eps
+                    } else {
+                        1e-13
+                    };
+                    let r = self
+                        .pool
+                        .install(|| lu::factor(sym, lsym, v, sched, nt, eps, opt.par_flops, old));
+                    self.stats.n_perturbed = r.n_perturbed;
+                    *num = Some(r);
+                }
             }
         }
         self.stats.n_factor += 1;
@@ -192,14 +320,23 @@ impl Solver {
         let t0 = Instant::now();
         match &self.kind {
             Kind::None => return Err("solve called before analyze".into()),
-            Kind::Symmetric { colptr, rowidx, sym, sched, num, vals } => {
+            Kind::Symmetric {
+                colptr,
+                rowidx,
+                sym,
+                sched,
+                num,
+                vals,
+            } => {
                 let num = num.as_ref().ok_or("solve called before factor")?;
                 let n = sym.n;
                 let solve_once = |rhs: &[f64], out: &mut [f64], w: &mut Vec<f64>| {
                     w.clear();
                     w.extend(sym.perm.iter().map(|&p| rhs[p]));
                     let nt = self.nthreads;
-                    self.pool.install(|| numeric::solve_permuted_par(sym, num, w, &sched.0, &sched.1, nt));
+                    self.pool.install(|| {
+                        numeric::solve_permuted_par(sym, num, w, &sched.0, &sched.1, nt)
+                    });
                     for (i, &p) in sym.perm.iter().enumerate() {
                         out[p] = w[i];
                     }
@@ -229,20 +366,120 @@ impl Solver {
                     }
                 }
             }
-            Kind::Unsymmetric { n, lu, .. } => {
-                use faer::linalg::solvers::SolveCore;
-                use faer::MatMut;
-                let lu = lu.as_ref().ok_or("solve called before factor")?;
-                x[..*n].copy_from_slice(&b[..*n]);
-                let xm = MatMut::from_column_major_slice_mut(&mut x[..*n], *n, 1);
-                // we factored A^T (CSR of A viewed as CSC) -> A x = b is a transpose solve
-                self.pool.install(|| lu.solve_transpose_in_place_with_conj(faer::Conj::No, xm));
-            }
+            Kind::Unsymmetric { .. } => self.solve_unsym(x, b)?,
         }
         self.stats.n_solve += 1;
         self.stats.t_solve += t0.elapsed().as_secs_f64();
         Ok(())
     }
+}
+
+impl Solver {
+    fn solve_unsym(&mut self, x: &mut [f64], b: &[f64]) -> Result<(), String> {
+        use faer::linalg::solvers::SolveCore;
+        use faer::MatMut;
+        let nt = self.nthreads;
+        let max_refine = self.max_refine.max(3);
+        let forced = if self.refine_mode > 0 {
+            self.refine_mode as usize
+        } else {
+            0
+        };
+        let Kind::Unsymmetric {
+            n,
+            rowptr,
+            colidx,
+            vals,
+            sym,
+            lsym,
+            num,
+            fallback,
+            ..
+        } = &mut self.kind
+        else {
+            unreachable!()
+        };
+        let n = *n;
+        let fb_solve = |lu: &faer::sparse::linalg::solvers::Lu<usize, f64>,
+                        x: &mut [f64],
+                        b: &[f64],
+                        pool: &rayon::ThreadPool| {
+            x[..n].copy_from_slice(&b[..n]);
+            let xm = MatMut::from_column_major_slice_mut(&mut x[..n], n, 1);
+            // the CSR of A was handed to faer as CSC, i.e. A^T was factored
+            pool.install(|| lu.solve_transpose_in_place_with_conj(faer::Conj::No, xm));
+        };
+        if let Some(lu) = fallback.as_ref() {
+            fb_solve(lu, x, b, &self.pool);
+            return Ok(());
+        }
+        let numr = num.as_ref().ok_or("solve called before factor")?;
+        let mut w = Vec::with_capacity(n);
+        let solve_once = |rhs: &[f64], out: &mut [f64], w: &mut Vec<f64>| {
+            w.clear();
+            w.extend(sym.perm.iter().map(|&p| rhs[p]));
+            lu::solve_permuted(sym, lsym, numr, w);
+            for (i, &p) in sym.perm.iter().enumerate() {
+                out[p] = w[i];
+            }
+        };
+        solve_once(b, x, &mut w);
+        let bn = b
+            .iter()
+            .map(|v| v * v)
+            .sum::<f64>()
+            .sqrt()
+            .max(f64::MIN_POSITIVE);
+        let mut r = vec![0.0; n];
+        let mut dx = vec![0.0; n];
+        let resid = |x: &[f64], r: &mut [f64]| -> f64 {
+            lu::csr_spmv(n, rowptr, colidx, vals, x, r);
+            let mut s = 0.0;
+            for i in 0..n {
+                r[i] = b[i] - r[i];
+                s += r[i] * r[i];
+            }
+            s.sqrt() / bn
+        };
+        let _ = nt;
+        let mut rel = resid(x, &mut r);
+        let mut steps = 0;
+        while (steps < forced) || (rel > 1e-12 && steps < max_refine) {
+            solve_once(&r, &mut dx, &mut w);
+            for i in 0..n {
+                x[i] += dx[i];
+            }
+            steps += 1;
+            self.stats.n_refine += 1;
+            rel = resid(x, &mut r);
+        }
+        if std::env::var_os("FRS_PROFILE").is_some() {
+            eprintln!("febio_rs_solver: LU solve rel residual {rel:.2e} after {steps} refinement steps, perturbed pivots {}", numr.n_perturbed);
+        }
+        if rel > 1e-8 {
+            // static pivoting was not accurate enough: partial-pivoting LU for this matrix
+            eprintln!("febio_rs_solver: static-pivot LU residual {rel:.2e}; switching to partial pivoting");
+            let lu = self.pool.install(|| faer_lu(n, rowptr, colidx, vals))?;
+            fb_solve(&lu, x, b, &self.pool);
+            *fallback = Some(lu);
+            self.stats.n_fallback += 1;
+        }
+        Ok(())
+    }
+}
+
+/// partial-pivoting sparse LU (faer) of the CSR matrix, factored as CSC of A^T
+fn faer_lu(
+    n: usize,
+    rp: &[usize],
+    ci: &[usize],
+    v: &[f64],
+) -> Result<faer::sparse::linalg::solvers::Lu<usize, f64>, String> {
+    use faer::sparse::linalg::solvers::{Lu, SymbolicLu};
+    use faer::sparse::{SparseColMatRef, SymbolicSparseColMatRef};
+    let s = SymbolicSparseColMatRef::new_checked(n, n, rp, None, ci);
+    let slu = SymbolicLu::try_new(s).map_err(|e| format!("symbolic LU: {e:?}"))?;
+    Lu::try_new_with_symbolic(slu, SparseColMatRef::new(s, v)).map_err(|e| format!("LU: {e:?}"))
 }
 
 /// debugging aid: write the matrix as  n, nnz (i64), colptr (i32), rowidx (i32), values (f64)
@@ -253,13 +490,24 @@ fn dump_lower(path: &str, cp: &[usize], ri: &[usize], v: &[f64]) {
         let n = cp.len() - 1;
         let _ = f.write_all(&(n as i64).to_le_bytes());
         let _ = f.write_all(&(ri.len() as i64).to_le_bytes());
-        for &x in cp { let _ = f.write_all(&(x as i32).to_le_bytes()); }
-        for &x in ri { let _ = f.write_all(&(x as i32).to_le_bytes()); }
-        for &x in v { let _ = f.write_all(&x.to_le_bytes()); }
+        for &x in cp {
+            let _ = f.write_all(&(x as i32).to_le_bytes());
+        }
+        for &x in ri {
+            let _ = f.write_all(&(x as i32).to_le_bytes());
+        }
+        for &x in v {
+            let _ = f.write_all(&x.to_le_bytes());
+        }
     }
 }
 
-fn to_usize(n: usize, ptr: &[i32], idx: &[i32], offset: i32) -> Result<(Vec<usize>, Vec<usize>), String> {
+fn to_usize(
+    n: usize,
+    ptr: &[i32],
+    idx: &[i32],
+    offset: i32,
+) -> Result<(Vec<usize>, Vec<usize>), String> {
     if ptr.len() != n + 1 {
         return Err("pointer array has wrong length".into());
     }
@@ -337,8 +585,17 @@ pub unsafe extern "C" fn frs_destroy(s: *mut Solver) {
 pub unsafe extern "C" fn frs_set_option(s: *mut Solver, key: i32, val: f64) -> i32 {
     let s = &mut *s;
     match key {
-        1 => s.ordering = match val as i32 { 1 => Ordering::Amd, 2 => Ordering::Natural, _ => Ordering::Metis },
-        2 => s.pivot_eps = val,
+        1 => {
+            s.ordering = match val as i32 {
+                1 => Ordering::Amd,
+                2 => Ordering::Natural,
+                _ => Ordering::Metis,
+            }
+        }
+        2 => {
+            s.pivot_eps = val;
+            s.pivot_eps_set = true;
+        }
         3 => s.refine_mode = val as i32,
         4 => s.max_refine = val.max(0.0) as usize,
         5 => s.par_flops = val,
@@ -349,7 +606,13 @@ pub unsafe extern "C" fn frs_set_option(s: *mut Solver, key: i32, val: f64) -> i
 
 /// symmetric: lower-triangular CSC == upper-triangular CSR (the PARDISO mtype=-2 layout)
 #[no_mangle]
-pub unsafe extern "C" fn frs_analyze_symmetric(s: *mut Solver, n: i32, ptr: *const i32, idx: *const i32, offset: i32) -> i32 {
+pub unsafe extern "C" fn frs_analyze_symmetric(
+    s: *mut Solver,
+    n: i32,
+    ptr: *const i32,
+    idx: *const i32,
+    offset: i32,
+) -> i32 {
     let s = &mut *s;
     let n = n as usize;
     let p = std::slice::from_raw_parts(ptr, n + 1);
@@ -363,7 +626,13 @@ pub unsafe extern "C" fn frs_analyze_symmetric(s: *mut Solver, n: i32, ptr: *con
 
 /// unsymmetric: full CSR
 #[no_mangle]
-pub unsafe extern "C" fn frs_analyze_unsymmetric(s: *mut Solver, n: i32, ptr: *const i32, idx: *const i32, offset: i32) -> i32 {
+pub unsafe extern "C" fn frs_analyze_unsymmetric(
+    s: *mut Solver,
+    n: i32,
+    ptr: *const i32,
+    idx: *const i32,
+    offset: i32,
+) -> i32 {
     let s = &mut *s;
     let n = n as usize;
     let p = std::slice::from_raw_parts(ptr, n + 1);
