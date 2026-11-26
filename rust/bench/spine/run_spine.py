@@ -44,6 +44,7 @@ def main():
     ap.add_argument("--workdir", required=True)
     ap.add_argument("--cases", default="all")
     ap.add_argument("--out", default="spine_results.json")
+    ap.add_argument("--solvers", default="pardiso,rust")
     a = ap.parse_args()
     os.makedirs(a.workdir, exist_ok=True)
     res = json.load(open(a.out)) if os.path.exists(a.out) else []
@@ -51,7 +52,10 @@ def main():
         if a.cases != "all" and name not in a.cases.split(","):
             continue
         ref = None
-        for sol in ("pardiso", "rust"):
+        refp = os.path.join(a.workdir, f"{name}_pardiso_disp.txt")
+        if "pardiso" not in a.solvers.split(",") and os.path.exists(refp):
+            ref = read_last_disp(refp)
+        for sol in a.solvers.split(","):
             stem = f"{name}_{sol}"
             feb = os.path.join(a.workdir, stem + ".feb")
             g = [sys.executable, os.path.join(HERE, "gen_fsu.py"), "--mode", mode, "--n", str(n), "--nz", str(nz),
