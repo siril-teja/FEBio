@@ -37,11 +37,12 @@ Subject-specific FEBio models of the human lumbar spine, L1–L5, without the sa
 
 ## Running them with FEBio 4
 
-The files are `febio_spec 2.5`. FEBio 4, both upstream and this fork, cannot read them unchanged. `rust/bench/finley/convert_feb25.py` makes these rewrites; none of them changes a value:
+The files are `febio_spec 2.5`. FEBio 4, both upstream and this fork, cannot read them unchanged. `rust/bench/finley/convert_feb25.py` makes these rewrites. The first four change no values; the fifth is a documented assumption:
 
 1. **Fiber angles:** `fiber-exp-pow` `<theta>/<phi>` become `<fiber type="angles">`. FEBio 4 evaluates these with the same formula as FEBio 2.x.
 2. **Material axes:** a fiber component's `<mat_axis>` moves to its parent `solid mixture`. This is exact here: each mixture's fibers share one axis, and the matrix is isotropic. The script checks both and refuses otherwise.
 3. **Contact name:** `sliding-tension-compression` becomes `sliding-elastic`. These are the same class under its FEBio 3 name.
 4. **Module:** files that use `sliding2` declare `<Module type="biphasic"/>`. FEBio 4 registers `sliding2` only in that module. There are no biphasic materials, so the equation count is unchanged.
+5. **Quasi-Newton method (assumption, 59F L1–L5 only):** `<qnmethod>2</qnmethod>` becomes BFGS. FEBio 4 reads 2 as JFNK, which needs an iterative linear solver; FEBio 2.5/2.6 had only BFGS and Broyden. BFGS matches the authors' reformation count. Both methods converge to the same rotation.
 
 The benchmark driver is `rust/bench/finley/run_finley.py`. Results are in `rust/BENCHMARKS.md`.

@@ -64,6 +64,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 3.9 | Portable release builds (runtime CPU dispatch) | ⬜ |
 | 3.10 | Pipelined ordered assembly (compute next chunk while one thread assembles) | ✅ |
 | 3.11 | Graph-colored parallel assembly (deterministic, thread-count independent) | ⬜ |
+| 3.12 | Faster Rust LU on large non-symmetric systems (≥ PARDISO) | ⬜ |
 
 ## Phase 4 — Rust FE core
 

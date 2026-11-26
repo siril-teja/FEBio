@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [0.5.1] - 2026-11-26
+
+### Fixed
+- **`convert_feb25.py`:** `<qnmethod>2</qnmethod>` (59F L1–L5) is mapped to BFGS. FEBio 4 reads 2 as JFNK, which upstream FEBio 4.13 rejects with a direct solver; FEBio 2.5/2.6 had only BFGS and Broyden. This is a documented assumption: it matches the authors' reformation count, and both methods converge to the same rotation.
+
+### Documentation
+- **`rust/BENCHMARKS.md`:** Finley L1–L5 results. FEBio-Rust is 1.07× native on 49F hex and 0.74× on 59F hybrid; the latter is a large non-symmetric LU, now ROADMAP 3.12. Results are identical to native.
+
 ## [0.5.0] - 2026-11-26
 
 ### Added
