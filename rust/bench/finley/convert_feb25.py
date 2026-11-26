@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make the Finley et al. (2018) febio_spec 2.5 models readable by FEBio 4.
 
-Four rewrites, all syntactic or scoping; no value changes:
+Five rewrites, all syntactic or scoping (plus one documented assumption); no value changes:
 
 1. Fiber angles. FEBio 2.x gave fiber-exp-pow directions as <theta>/<phi> in the
    material: spherical angles in the local material axes,
@@ -24,6 +24,11 @@ Four rewrites, all syntactic or scoping; no value changes:
    matrix, whereas FEBio 2.x's solid solver (which these models were built for) used
    a symmetric one and all their contacts set symmetric_stiffness=1; the converted
    file therefore sets <symmetric_stiffness>1</symmetric_stiffness> in Control.
+5. Quasi-Newton method (assumption). 59F_L15_hybrid sets <qnmethod>2</qnmethod>.
+   FEBio 4 reads 2 as JFNK, which needs an iterative linear solver; FEBio 2.5/2.6, which
+   produced the authors' log, only had BFGS (0) and Broyden (1). BFGS reproduces the
+   authors' 100 reformations (Broyden: 112) and is FEBio 2.x's default, so 2 -> 0. Both
+   converge to the same rotation (19.571 vs 19.568 deg).
 
 usage: convert_feb25.py in.feb out.feb
 """
@@ -89,12 +94,18 @@ def module_scope(text):
     return out, n
 
 
+def qn_method(text):
+    out, n = re.subn(r"<qnmethod>\s*2\s*</qnmethod>", "<qnmethod>0</qnmethod>", text)
+    return out, n
+
+
 def convert(text):
     text, na = fiber_angles(text)
     text, nm = mixture_axes(text)
     text, nc = contact_names(text)
     text, nb = module_scope(text)
-    return text, na, nm, nc + nb
+    text, nq = qn_method(text)
+    return text, na, nm, nc + nb + nq
 
 
 if __name__ == "__main__":
