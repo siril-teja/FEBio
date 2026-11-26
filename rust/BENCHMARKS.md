@@ -133,3 +133,60 @@ Times are in seconds. "lin." is FEBio's "time in linear solver". ROM is the L4 r
 3. **Faster symmetric factorization** at 1–2 threads, as in the block benchmarks above.
 
 The smallest symmetric speed-up is `fsu_n40_ar` at 4 threads (1.08×). Axial rotation engages facet contact earlier, so the profile changes more often and some reformations need a full analysis.
+
+---
+
+# End-to-end profiling and FEBio-side optimizations
+
+**Method.** `perf` sampling (DWARF call graphs) on the spine FSU surrogate and block models. Then an A/B of two builds on the same inputs (`rust/bench/ab_builds.py`, raw data in `results/ab_end_to_end.json`):
+- *old* = `develop` after PR #1;
+- *new* = this change.
+
+Both builds use 4 threads, 2 alternating repetitions, and means are reported.
+
+## Where the time goes outside the linear solver (spine FSU n40, Rust solver, 4 threads)
+
+| phase (FEBio timer) | share of run | main cost |
+|---|---:|---|
+| model update | ~20% | material evaluation at every integration point: uncoupled fiber mixture (`DevStress`), `pow`, deformation gradient; line searches repeat it |
+| serialization | ~9% | full-model snapshot to a `DumpMemStream` before every time step, for time-step retries (`max_retries > 0`) |
+| reforming stiffness | ~7% | static matrix profile rebuilt at every time step (`SparseMatrixProfile::insertRow`) |
+| stiffness, residual | ~7%, ~6% | element loops (OpenMP) |
+
+Profiling also turned up:
+- **Fiber direction recomputed at every evaluation:** each time a fiber material was evaluated, the reference fiber direction was rebuilt from scratch: the local-axis chain (`GetLocalCS`, several `dynamic_cast`s) and the cylindrical generator's quaternions. That was about 9% of samples, plus most of the 11% spent in `dynamic_cast`.
+- **28% of samples were OpenMP threads spin-waiting** (`kmp_flag_64::wait`): FEBio's idle OpenMP threads spin for 200 ms after every parallel loop, competing for cores with the Rust solver's threads.
+
+## Changes (all bitwise result-preserving)
+
+1. **Fiber-direction memo** (`FEElasticFiberMaterial[UC]::FiberVector`).
+   - Valuators report `isReferenceInvariant()`, which is true only for those depending solely on the reference geometry: constant, local-element, cylindrical, spherical, polar and vector maps/generators. Math-expression and mapped valuators are excluded, since they can depend on time or state.
+   - When the whole local-axis chain is invariant, the reference fiber direction is memoized on the `FEMaterialPoint`, keyed by the owning material and the point's reference position.
+2. **PARDISO wrapper:** reordering and symbolic factorization (phase 11) now run only on the first `Factor()` after `PreProcess()`, instead of at every reformation. The pattern can only change through `PreProcess()`.
+3. **Rust solver:** sets the Intel OpenMP blocktime to 0 while in use (`omp_blocktime`, default 0; −1 = leave unchanged), so idle OpenMP threads sleep instead of spinning.
+
+**Equivalence.**
+- Single-threaded runs of the old and new binaries produce **byte-identical** output on 5 models: spine FSU with the Rust solver, spine FSU with PARDISO, biphasic FSU, hex8 with PARDISO, and a coupled fiber mixture with cylindrical + constant fibers.
+- Multithreaded runs differ only at round-off (OpenMP assembly order), with identical iteration counts.
+- The coupled fiber mixture is now part of the CI regression set.
+
+## A/B results (4 threads, means of 2 runs)
+
+| model | solver | total old → new (s) | change | linear solver old → new | model update old → new | stiffness old → new |
+|---|---|---|---:|---|---|---|
+| spine_n40_flex | pardiso | 16.9 → 16.4 | -3% | 8.9 → 8.7 | 2.85 → 2.80 | 1.03 → 0.92 |
+| spine_n40_flex | rust | 13.7 → 13.1 | -4% | 6.2 → 5.3 | 2.77 → 2.88 | 1.06 → 0.98 |
+| spine_bp_n24_flex | pardiso | 19.1 → 19.4 | +2% | 15.9 → 16.3 | 0.98 → 0.86 | 0.63 → 0.58 |
+| spine_bp_n24_flex | rust | 6.6 → 6.9 | +5% | 3.5 → 3.5 | 0.95 → 0.95 | 0.60 → 0.67 |
+| hex20_n14_mr_newton | pardiso | 43.7 → 30.5 | **-30%** | 37.4 → 24.2 | 0.50 → 0.53 | 4.72 → 4.73 |
+| hex20_n14_mr_newton | rust | 34.1 → 34.0 | -0% | 27.7 → 27.1 | 0.58 → 0.62 | 4.77 → 5.15 |
+| hex8_n20_newton | pardiso | 12.9 → 8.8 | **-32%** | 11.3 → 7.1 | 0.21 → 0.22 | 0.74 → 0.85 |
+| hex8_n20_newton | rust | 10.1 → 10.1 | +0% | 8.3 → 8.2 | 0.24 → 0.25 | 0.84 → 0.93 |
+
+**Reading.**
+- **PARDISO wrapper fix: −30% end to end** on Newton runs without contact. It is C++ only and benefits every MKL user. It does little for contact models, because FEBio rebuilds the matrix profile, and so re-runs `PreProcess`, at every time step there.
+- **Fiber memo and OpenMP blocktime: within the ±5% noise of this VM** at 4 threads. In a controlled single-model A/B (spine n24, 3 runs each) the fiber memo reduced model-update time by 10% and stiffness time by 13% (−7% total). These changes are cheap and safe, but not large.
+- **Rust vs. the fixed PARDISO wrapper.** Without FEBio's redundant per-reformation re-analysis, PARDISO is now *faster* than the Rust solver at 4 threads on the non-contact block models (hex20 MR: 24.2 vs 27.1 s; hex8 n20: 7.1 vs 8.2 s). Much of Rust's earlier 4-thread advantage on those models came from that re-analysis, not from a faster kernel; see the kernel comparison above (parity at 4 threads, Rust 1.47× faster at 1 thread). Rust remains clearly faster on:
+  - contact models, which reuse an identical pattern across rebuilds: 5.3 vs 8.7 s;
+  - biphasic/unsymmetric systems: 3.5 vs 16.3 s;
+  - single-threaded runs.

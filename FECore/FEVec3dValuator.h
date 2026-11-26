@@ -51,6 +51,11 @@ public:
 	// is the valuator constant
 	virtual bool isConst() { return false; }
 
+	// returns true if the value depends only on the material point's reference
+	// configuration (position, element) and on fixed parameters, i.e. never on time
+	// or on the deformation state. Such values can be cached per material point.
+	virtual bool isReferenceInvariant() { return isConst(); }
+
 	// return the const value
 	virtual vec3d* constValue() { return nullptr; }
 

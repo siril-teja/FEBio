@@ -153,6 +153,13 @@ public:
 	// pointer to element's shape function values
 	double* m_shape;
 
+	// Memo for reference-invariant directions (e.g. fiber directions, see
+	// FEElasticFiberMaterial::FiberVector): value m_cacheVec computed by m_cacheOwner for
+	// the reference position m_cacheR0. Not serialized; recomputed on first use.
+	const void*	m_cacheOwner = nullptr;
+	vec3d		m_cacheR0;
+	vec3d		m_cacheVec;
+
 protected:
 	FEMaterialPointData* m_data;
 };

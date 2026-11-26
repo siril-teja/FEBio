@@ -47,6 +47,11 @@ public:
 
 	virtual bool isConst() { return false; }
 
+	// returns true if the value depends only on the material point's reference
+	// configuration (position, element) and on fixed parameters, i.e. never on time
+	// or on the deformation state. Such values can be cached per material point.
+	virtual bool isReferenceInvariant() { return isConst(); }
+
 	virtual mat3d* constValue() { return nullptr; }
 };
 
@@ -86,6 +91,7 @@ public:
 	bool Init() override;
 
 	mat3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEMat3dValuator* copy() override;
 
@@ -112,6 +118,7 @@ public:
 	void SetSphereVector(const vec3d& r) { m_r = r; }
 
 	mat3d operator() (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEMat3dValuator* copy() override;
 
@@ -138,6 +145,7 @@ public:
 	void SetCylinderRef(vec3d r) { m_r = r; m_r.unit(); }
 
 	mat3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEMat3dValuator* copy() override;
 
@@ -169,6 +177,7 @@ public:
 	void SetRadius1(double r) { m_R1 = r; }
 
 	mat3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEMat3dValuator* copy() override;
 
@@ -193,6 +202,7 @@ public:
 	void SetVectors(vec3d a, vec3d d);
 
 	mat3d operator () (const FEMaterialPoint& mp) override;
+	bool isReferenceInvariant() override { return true; }
 
 	FEMat3dValuator* copy() override;
 

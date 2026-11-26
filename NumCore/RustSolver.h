@@ -60,6 +60,7 @@ private:
 	double	m_pivotEps;
 	int		m_printLevel;
 	bool	m_reuseOrdering;	// reuse ordering for slightly changed patterns (contact)
+	int		m_ompBlocktime;		// OpenMP (libiomp5) blocktime in ms while using this solver; -1 = unchanged
 
 	DECLARE_FECORE_CLASS();
 };
