@@ -11,7 +11,8 @@ Fails (exit 1) unless:
   4. CHANGELOG.md has a "## [<new version>]" entry;
   5. the Rust crate version (rust/febio_rs_solver/Cargo.toml) equals VERSION.
 
-In GitHub Actions the PR is read from $GITHUB_EVENT_PATH. Locally:
+In GitHub Actions the PR is read from $GITHUB_EVENT_PATH; the title and description
+from $PR_JSON (the PR as it is now) when the workflow provides it. Locally:
   ci/pr_policy.py --title "perf(x): ..." --body-file body.md --base origin/main --head HEAD
 """
 import argparse, json, os, re, subprocess, sys
@@ -48,6 +49,11 @@ def main():
         pr = json.load(open(ev))["pull_request"]
         title, body = pr["title"], pr.get("body") or ""
         base, head = pr["base"]["sha"], pr["head"]["sha"]
+        # prefer the PR's current title/description (fetched by the workflow) over the event snapshot
+        live = os.environ.get("PR_JSON")
+        if live and os.path.exists(live):
+            cur = json.load(open(live))
+            title, body = cur["title"], cur.get("body") or ""
     errors, notes = [], []
 
     # 1. conventional title and commit subjects

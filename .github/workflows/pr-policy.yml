@@ -9,6 +9,13 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
+# A newer event for the same PR (e.g. the description edited right after opening)
+# cancels the older run instead of leaving a stale failure next to the new result.
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   policy:
@@ -18,5 +25,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Read the current title and description
+        # The event payload holds the PR as it was when the event fired. Wait briefly for
+        # follow-up edits, then check the PR as it is now.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ github.api_url }}/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}
+        run: |
+          sleep 30
+          curl -sSf -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$URL" > "$RUNNER_TEMP/pr.json"
+          echo "PR_JSON=$RUNNER_TEMP/pr.json" >> "$GITHUB_ENV"
       - name: Check
         run: python3 ci/pr_policy.py
