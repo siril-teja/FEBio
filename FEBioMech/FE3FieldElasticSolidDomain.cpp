@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include <limits>
 #include "FE3FieldElasticSolidDomain.h"
 #include "FEUncoupledMaterial.h"
@@ -137,43 +138,44 @@ void FE3FieldElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 
 	// repeat over all solid elements
 	int NE = (int)m_Elem.size();
-	#pragma omp parallel for
-	for (int iel=0; iel<NE; ++iel)
-	{
-		FESolidElement& el = m_Elem[iel];
+	// element matrices are computed in parallel and assembled in element order (deterministic)
+	struct Item { FEElementMatrix ke; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int iel, Item& it) {
+			FESolidElement& el = m_Elem[iel];
 
-		// element stiffness matrix
-		FEElementMatrix ke(el);
+			// element stiffness matrix
+			it.ke = FEElementMatrix(el);
+			FEElementMatrix& ke = it.ke;
 
-		// create the element's stiffness matrix
-		int ndof = 3*el.Nodes();
-		ke.resize(ndof, ndof);
-		ke.zero();
+			// create the element's stiffness matrix
+			int ndof = 3*el.Nodes();
+			ke.resize(ndof, ndof);
+			ke.zero();
 
-		// calculate material stiffness (i.e. constitutive component)
-		ElementMaterialStiffness(iel, ke);
+			// calculate material stiffness (i.e. constitutive component)
+			ElementMaterialStiffness(iel, ke);
 
-		// calculate geometrical stiffness
-		ElementGeometricalStiffness(iel, ke);
+			// calculate geometrical stiffness
+			ElementGeometricalStiffness(iel, ke);
 
-		// Calculate dilatational stiffness
-		ElementDilatationalStiffness(fem, iel, ke);
+			// Calculate dilatational stiffness
+			ElementDilatationalStiffness(fem, iel, ke);
 
-		// assign symmetic parts
-		// TODO: Can this be omitted by changing the Assemble routine so that it only
-		// grabs elements from the upper diagonal matrix?
-		for (int i=0; i<ndof; ++i)
-			for (int j=i+1; j<ndof; ++j)
-				ke[j][i] = ke[i][j];
+			// assign symmetic parts
+			for (int i=0; i<ndof; ++i)
+				for (int j=i+1; j<ndof; ++j)
+					ke[j][i] = ke[i][j];
 
-		// get the element's LM vector
-		vector<int> lm;
-		UnpackLM(el, lm);
-		ke.SetIndices(lm);
-
-		// assemble element matrix in global stiffness matrix
-		LS.Assemble(ke);
-	}
+			// get the element's LM vector
+			vector<int> lm;
+			UnpackLM(el, lm);
+			ke.SetIndices(lm);
+		},
+		[&](int iel, Item& it) {
+			// assemble element matrix in global stiffness matrix
+			LS.Assemble(it.ke);
+		}, 256);
 }
 
 //-----------------------------------------------------------------------------
@@ -450,7 +452,10 @@ void FE3FieldElasticSolidDomain::Update(const FETimeInfo& tp)
 {
 	bool berr = false;
 	int NE = (int) m_Elem.size();
-	#pragma omp parallel for shared(NE, berr)
+	// Each element only writes its own data, so the stress updates are order independent and
+	// run on all requested threads also in deterministic mode. Errors are logged in element order.
+	FECoreThreads::OrderedMessages errs;
+	#pragma omp parallel for shared(NE, berr) num_threads(FECoreThreads::RequestedThreads())
 	for (int i=0; i<NE; ++i)
 	{
 		try
@@ -459,13 +464,12 @@ void FE3FieldElasticSolidDomain::Update(const FETimeInfo& tp)
 		}
 		catch (NegativeJacobian e)
 		{
-			#pragma omp critical
-			{
-				berr = true;
-				if (e.DoOutput()) feLogError(e.what());
-			}
+			#pragma omp atomic write
+			berr = true;
+			if (e.DoOutput()) errs.add(i, e.what());
 		}
 	}
+	errs.flush([this](const std::string& msg) { feLogError(msg.c_str()); });
 
 	if (berr) throw NegativeJacobianDetected();
 }

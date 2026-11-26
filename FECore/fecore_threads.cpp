@@ -82,3 +82,9 @@ bool FECoreThreads::IsDeterministic()
 	initOnce();
 	return s_deterministic;
 }
+
+void FECoreThreads::OrderedMessages::add(int i, const std::string& msg)
+{
+#pragma omp critical (FECoreThreads_OrderedMessages)
+	m_msg[i] = msg;
+}

@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include <limits>
 #include "FEElasticSolidDomain.h"
 #include "FEElasticMaterial.h"
@@ -165,31 +166,29 @@ void FEElasticSolidDomain::PreSolveUpdate(const FETimeInfo& timeInfo)
 void FEElasticSolidDomain::InternalForces(FEGlobalVector& R)
 {
 	int NE = Elements();
-	#pragma omp parallel for shared (NE)
-	for (int i=0; i<NE; ++i)
-	{
-		// get the element
-		FESolidElement& el = m_Elem[i];
+	// element vectors are computed in parallel and assembled in element order (deterministic)
+	struct Item { vector<double> fe; vector<int> lm; bool active = false; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int i, Item& it) {
+			// get the element
+			FESolidElement& el = m_Elem[i];
+			it.active = el.isActive();
+			if (it.active) {
+				// get the element force vector and initialize it to zero
+				int ndof = 3 * el.Nodes();
+				it.fe.assign(ndof, 0);
 
-		if (el.isActive()) {
-			// element force vector
-			vector<double> fe;
-			vector<int> lm;
+				// calculate internal force vector
+				ElementInternalForce(el, it.fe);
 
-			// get the element force vector and initialize it to zero
-			int ndof = 3 * el.Nodes();
-			fe.assign(ndof, 0);
-
-			// calculate internal force vector
-			ElementInternalForce(el, fe);
-
-			// get the element's LM vector
-			UnpackLM(el, lm);
-
+				// get the element's LM vector
+				UnpackLM(el, it.lm);
+			}
+		},
+		[&](int i, Item& it) {
 			// assemble element 'fe'-vector into global R vector
-			R.Assemble(el.m_node, lm, fe);
-		}
-	}
+			if (it.active) R.Assemble(m_Elem[i].m_node, it.lm, it.fe);
+		});
 }
 
 //-----------------------------------------------------------------------------
@@ -420,43 +419,38 @@ void FEElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 {
 	// repeat over all solid elements
 	int NE = Elements();
-	
-	#pragma omp parallel for shared (NE)
-	for (int iel=0; iel<NE; ++iel)
-	{
-		FESolidElement& el = m_Elem[iel];
 
-		if (el.isActive()) {
+	// element matrices are computed in parallel and assembled in element order (deterministic)
+	struct Item { FEElementMatrix ke; bool active = false; };
+	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+		[&](int iel, Item& it) {
+			FESolidElement& el = m_Elem[iel];
+			it.active = el.isActive();
+			if (it.active) {
+				// get the element's LM vector
+				vector<int> lm;
+				UnpackLM(el, lm);
 
-			// get the element's LM vector
-			vector<int> lm;
-			UnpackLM(el, lm);
+				// element stiffness matrix
+				it.ke = FEElementMatrix(el, lm);
+				FEElementMatrix& ke = it.ke;
 
-			// element stiffness matrix
-			FEElementMatrix ke(el, lm);
+				// create the element's stiffness matrix
+				int ndof = 3 * el.Nodes();
+				ke.resize(ndof, ndof);
+				ke.zero();
 
-			// create the element's stiffness matrix
-			int ndof = 3 * el.Nodes();
-			ke.resize(ndof, ndof);
-			ke.zero();
+				// calculate geometrical stiffness
+				ElementGeometricalStiffness(el, ke);
 
-			// calculate geometrical stiffness
-			ElementGeometricalStiffness(el, ke);
-
-			// calculate material stiffness
-			ElementMaterialStiffness(el, ke);
-
-/*			// assign symmetic parts
-			// TODO: Can this be omitted by changing the Assemble routine so that it only
-			// grabs elements from the upper diagonal matrix?
-			for (int i = 0; i < ndof; ++i)
-				for (int j = i + 1; j < ndof; ++j)
-					ke[j][i] = ke[i][j];
-*/
+				// calculate material stiffness
+				ElementMaterialStiffness(el, ke);
+			}
+		},
+		[&](int iel, Item& it) {
 			// assemble element matrix in global stiffness matrix
-			LS.Assemble(ke);
-		}
-	}
+			if (it.active) LS.Assemble(it.ke);
+		}, 256);
 }
 
 //-----------------------------------------------------------------------------
@@ -548,7 +542,10 @@ void FEElasticSolidDomain::Update(const FETimeInfo& tp)
 {
 	bool berr = false;
 	int NE = Elements();
-	#pragma omp parallel for shared(NE, berr)
+	// Each element only writes its own data, so the stress updates are order independent and
+	// run on all requested threads also in deterministic mode. Errors are logged in element order.
+	FECoreThreads::OrderedMessages errs;
+	#pragma omp parallel for shared(NE, berr) num_threads(FECoreThreads::RequestedThreads())
 	for (int i=0; i<NE; ++i)
 	{
 		try
@@ -561,14 +558,12 @@ void FEElasticSolidDomain::Update(const FETimeInfo& tp)
 		}
 		catch (NegativeJacobian e)
 		{
-			#pragma omp critical
-			{
-				// reset the logfile mode
-				berr = true;
-				if (e.DoOutput()) feLogError(e.what());
-			}
+			#pragma omp atomic write
+			berr = true;
+			if (e.DoOutput()) errs.add(i, e.what());
 		}
 	}
+	errs.flush([this](const std::string& msg) { feLogError(msg.c_str()); });
 
 	if (berr) throw NegativeJacobianDetected();
 }
