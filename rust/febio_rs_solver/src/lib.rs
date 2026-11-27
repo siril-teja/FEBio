@@ -361,6 +361,10 @@ impl Solver {
                 }
                 v.clear();
                 v.extend(vorder.iter().map(|&t| vals[t]));
+                if let Ok(path) = std::env::var("FRS_DUMP") {
+                    // sorted CSR (same layout as the symmetric dump: n, nnz, ptr, idx, vals)
+                    dump_lower(&path, rowptr, colidx, v);
+                }
                 *fallback = None;
                 if *use_fallback {
                     *fallback = Some(self.pool.install(|| faer_lu(*n, rowptr, colidx, v))?);
@@ -451,6 +455,7 @@ impl Solver {
         } else {
             0
         };
+        let pool = &self.pool;
         let Kind::Unsymmetric {
             n,
             rowptr,
@@ -458,6 +463,7 @@ impl Solver {
             vals,
             sym,
             lsym,
+            sched,
             num,
             fallback,
             ..
@@ -484,7 +490,7 @@ impl Solver {
         let solve_once = |rhs: &[f64], out: &mut [f64], w: &mut Vec<f64>| {
             w.clear();
             w.extend(sym.perm.iter().map(|&p| rhs[p]));
-            lu::solve_permuted(sym, lsym, numr, w);
+            pool.install(|| lu::solve_permuted_par(sym, lsym, numr, w, &sched.0, &sched.1));
             for (i, &p) in sym.perm.iter().enumerate() {
                 out[p] = w[i];
             }
