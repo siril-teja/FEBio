@@ -176,13 +176,15 @@ The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU r
 |---|---:|---:|---:|---:|---|---|
 | 49F L1–L5 hex | 280,467 | 1042 s (lin. 802) | **971 s** (lin. 623) | **1.07×** | 958 / 101, identical | 18.2622, identical |
 | 59F L1–L5 hybrid | 170,478 | **703 s** (lin. 520) | 947 s (lin. 668) | 0.74× | 867 / 101, identical | 19.5712, identical |
+| 59F L1–L5 hybrid, 1.1.4 (rerun) | 170,478 | 981 s (lin. 709) | **937 s** (lin. 636) | **1.05×** | 867 / 101, identical | 19.5712, identical |
 
-Raw data is in `rust/bench/results/finley_l15.json`. The final rigid-body quaternions agree to every printed digit.
+Raw data is in `rust/bench/results/finley_l15.json`; the 1.1.4 rerun is in `finley_l15_59_v114.json`. The rerun ran both builds back to back on a VM that was about 40% slower than for the earlier rows, so compare within a row only. Its IDP and facet forces are identical too (see below). The final rigid-body quaternions agree to every printed digit.
 
 - **49F hex (symmetric matrix):** the Rust LDLᵀ is 22% faster than PARDISO. Stiffness, residual and model update are 1.5–2× slower than native, which keeps the end-to-end gain at 7%.
 - **59F hybrid:** the model sets `symmetric_stiffness 0`, so it solves a non-symmetric system with LU. In this table (1.0.0) PARDISO's LU is faster: 101 factorizations of a matrix with 2.1·10⁸ nonzeros in L. Iterative refinement is not the cause: 4 refinement steps in 80 solves over the first 12 steps. ROADMAP 3.12 (1.1.2–1.1.3) has since made the Rust LU faster than PARDISO; see below.
 - **59F hybrid after the LU work (1.1.3) and colored assembly (1.1.4):** timings vary by up to ±15% between runs on this VM, so builds were compared back to back.
   - **Full run, native then 1.1.3:** native 969 s (lin. 700), Rust 1046 s (lin. 644). The Rust LU now beats PARDISO, but stiffness, residual and model update cost 285 s against native's 166 s. The model also ran slower on this VM than for the table above (native 969 s vs 703 s).
+  - **Full run, native then 1.1.4:** native 981 s (lin. 709, stiffness 41, residual 55, update 71), Rust 937 s (lin. 636, stiffness 41, residual 71, update 75): **1.05×**. Range of motion, IDP and facet forces identical.
   - **First 20 steps, alternated twice (s):**
 
     | build | total | linear solver | stiffness | residual | model update |
