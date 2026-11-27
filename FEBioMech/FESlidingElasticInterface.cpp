@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FESlidingElasticInterface.h"
 #include "FECore/FENormalProjection.h"
 #include "FECore/FEModel.h"
@@ -606,7 +607,8 @@ void FESlidingElasticInterface::ProjectSurface(FESlidingElasticSurface& ss, FESl
     }
     
     // loop over all integration points
-#pragma omp parallel for schedule(dynamic)
+    // (each point only writes its own data: all requested threads, also in deterministic mode)
+#pragma omp parallel for schedule(dynamic, 8) num_threads(FECoreThreads::RequestedThreads())
     for (int i=0; i<ss.Elements(); ++i)
     {
         FESurfaceElement& el = ss.Element(i);
@@ -1661,7 +1663,8 @@ void FESlidingElasticInterface::UpdateContactPressures()
         FESlidingElasticSurface& ms = (np == 0? m_ms : m_ss);
         
         // loop over all elements of the primary surface
-#pragma omp parallel for
+        // (each point only writes its own data: all requested threads, also in deterministic mode)
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
         for (int n=0; n<ss.Elements(); ++n)
         {
             FESurfaceElement& el = ss.Element(n);

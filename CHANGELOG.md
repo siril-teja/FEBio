@@ -12,6 +12,16 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.6] - 2026-11-27
+
+### Performance
+- **Deterministic parallel contact projection** (ROADMAP 3.4).
+  - `sliding2`: the integration-point projection loop now runs in parallel. Its temporaries were shared between iterations; they are now per point.
+  - `sliding-elastic`: the projection and contact-pressure loops already had OpenMP pragmas but ran on one thread in deterministic mode. They now use all requested threads.
+  - Each integration point writes only its own data, so the output is unchanged. Plot-file data is identical to 1.1.4 for all ten regression models, and for the first 6 steps of Finley 59F L1–L5.
+  - Finley 59F L1–L5, first 6 steps, 4 threads: contact update 0.69 s → 0.27 s.
+  - Contact forces and stiffness stay serial. They cost 1.7 s of the full 59F run, too little to parallelize.
+
 ## [1.1.5] - 2026-11-27
 
 ### Documentation

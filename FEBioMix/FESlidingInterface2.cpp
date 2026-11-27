@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FESlidingInterface2.h"
 #include "FEBiphasic.h"
 #include "FECore/FEModel.h"
@@ -691,12 +692,6 @@ double FESlidingInterface2::AutoPressurePenalty(FESurfaceElement& el, FESlidingS
 void FESlidingInterface2::ProjectSurface(FESlidingSurface2& ss, FESlidingSurface2& ms, bool bupseg, bool bmove)
 {
 	FEMesh& mesh = GetFEModel()->GetMesh();
-	FESurfaceElement* pme;
-	vec3d r, nu;
-	double rs[2];
-	double Ln;
-
-	double ps[FEElement::MAX_NODES], p1;
 
     double psf = GetPenaltyScaleFactor();
     
@@ -758,11 +753,20 @@ void FESlidingInterface2::ProjectSurface(FESlidingSurface2& ss, FESlidingSurface
 	}
 
 	// loop over all integration points
- //   #pragma omp parallel for shared(R, bupseg)
+	// Each integration point only writes its own data, so the points are projected in
+	// parallel (all requested threads, also in deterministic mode).
+	#pragma omp parallel for schedule(dynamic, 8) num_threads(FECoreThreads::RequestedThreads())
 	for (int i=0; i<ss.Elements(); ++i)
 	{
 		FESurfaceElement& el = ss.Element(i);
 		bool sporo = ss.m_poro[i];
+
+		// per-point temporaries
+		FESurfaceElement* pme = nullptr;
+		vec3d r, nu;
+		double rs[2] = { 0, 0 };
+		double Ln = 0;
+		double ps[FEElement::MAX_NODES], p1 = 0;
 
 		int ne = el.Nodes();
 		int nint = el.GaussPoints();
