@@ -182,6 +182,15 @@ bool FEGlobalMatrix::Create(FEModel* pfem, int neq, bool breset)
 	// reconstructing it every time we come here saves us a lot of time. The 
 	// static profile is stored in the variable m_MPs.
 
+	// A rebuild of the static profile is only needed when something it depends on has
+	// changed (e.g. at a new time step, the connectivity normally has not).
+	if (breset)
+	{
+		const unsigned long long key = pfem->StaticProfileKey();
+		if ((key != 0) && (key == m_staticKey)) breset = false;
+		else m_staticKey = key;
+	}
+
 	// begin building the profile
 	build_begin(neq);
 	{

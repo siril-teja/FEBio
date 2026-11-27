@@ -168,6 +168,7 @@ protected:
 
 	SparseMatrixProfile*	m_pMP;		//!< profile of sparse matrix
 	SparseMatrixProfile		m_MPs;		//!< the "static" part of the matrix profile
+	unsigned long long		m_staticKey = 0;	//!< FEModel::StaticProfileKey() of m_MPs (0 = none)
 	vector< vector<int> >	m_LM;		//!< used for building the stiffness matrix
 	int	m_nlm;				//!< nr of elements in m_LM array
 };

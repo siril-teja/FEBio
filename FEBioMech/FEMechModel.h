@@ -70,6 +70,7 @@ public:
 
 	//! Build the matrix profile for this model
 	void BuildMatrixProfile(FEGlobalMatrix& G, bool breset) override;
+	unsigned long long StaticProfileKey() override;
 
 	// update rigid part of mesh
 	void UpdateRigidMesh();

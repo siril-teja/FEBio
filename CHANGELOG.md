@@ -12,6 +12,15 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.8] - 2026-11-27
+
+### Performance
+- **The static matrix profile is reused across time steps** (OPEN_ITEMS P6).
+  - Before, every reformation at the first iteration of a time step rebuilt the element ("static") part of the sparse-matrix profile. On the Finley models that is every reformation.
+  - `FEGlobalMatrix::Create` now keeps it while `FEModel::StaticProfileKey()` is unchanged. The key is a hash of element connectivity and activity, nodal equation numbers, rigid-body attachment, node flags and, in `FEMechModel`, rigid-body equations.
+  - Anything that changes the profile (erosion, mesh adaptation, a new equation numbering) changes the key and forces a rebuild. Models with linear constraints always rebuild.
+  - Finley 59F L1–L5, first 6 steps, 4 threads: reformation time 4.14 s → 1.85 s. The matrix is unchanged (same nonzeros) and the output is identical to 1.1.7, value by value, for this model and all ten regression models.
+
 ## [1.1.7] - 2026-11-27
 
 ### Performance
