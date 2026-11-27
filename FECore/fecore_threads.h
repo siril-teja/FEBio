@@ -31,9 +31,6 @@ SOFTWARE.*/
 #include <atomic>
 #include <memory>
 #include <algorithm>
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 //! Thread configuration and run-to-run determinism.
 //!

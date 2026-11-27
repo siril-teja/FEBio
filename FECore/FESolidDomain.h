@@ -31,7 +31,6 @@ SOFTWARE.*/
 #include "FEDofList.h"
 #include "FELinearSystem.h"
 #include "FESolidElement.h"
-#include "fecore_threads.h"
 
 //-----------------------------------------------------------------------------
 // This typedef defines a surface integrand. 
@@ -287,16 +286,6 @@ public:
 		FEVolumeMatrixIntegrand f	// the matrix function to evaluate
 	);
 
-	//! Coloring of the elements for the deterministic parallel assembly
-	//! (FECoreThreads::ComputeAndAssembleColored). Elements that share a node, or nodes
-	//! attached to the same rigid body, get different colors. Rebuilt when the rigid body
-	//! attachment of the domain's nodes changes.
-	const FECoreThreads::Coloring& AssemblyColoring();
-
-	//! true if the assembly writes to global entries that the coloring does not cover
-	//! (linear constraints); the colored loop then runs on one thread.
-	bool SerialAssembly() const;
-
 protected:
     vector<FESolidElement>	m_Elem;		//!< array of elements
 	FE_Element_Spec			m_elemSpec;	//!< the element spec
@@ -304,10 +293,5 @@ protected:
 	FEDofList	m_dofU;
 	FEDofList	m_dofSU;
 
-private:
-	FECoreThreads::Coloring	m_coloring;		//!< assembly coloring
-	std::vector<int>		m_coloringRid;	//!< rigid body ids of the domain nodes it was built for
-	bool					m_coloringBuilt = false;
-
-		DECLARE_FECORE_CLASS();
+	DECLARE_FECORE_CLASS();
 };

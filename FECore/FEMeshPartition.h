@@ -33,6 +33,7 @@ SOFTWARE.*/
 #include "FEGlobalVector.h"
 #include "FETimeInfo.h"
 #include <functional>
+#include "fecore_threads.h"
 
 //-----------------------------------------------------------------------------
 // forward declaration of classes
@@ -136,6 +137,16 @@ public:
 	bool IsActive() const { return m_bactive; }
 	void SetActive(bool b) { m_bactive = b; }
 
+	//! Coloring of the elements for the deterministic parallel assembly
+	//! (FECoreThreads::ComputeAndAssembleColored). Elements that share a node, or nodes
+	//! attached to the same rigid body, get different colors. Rebuilt when the rigid body
+	//! attachment of the partition's nodes changes.
+	const FECoreThreads::Coloring& AssemblyColoring();
+
+	//! true if the assembly writes to global entries that the coloring does not cover
+	//! (linear constraints); the colored loop then runs on one thread.
+	bool SerialAssembly() const;
+
 protected:
 	FEMesh*		m_pMesh;	//!< the mesh that this domain is a part of
 	vector<int>	m_Node;		//!< list of nodes in this domain
@@ -147,4 +158,8 @@ protected:
 
 private:
 	vector<FEDataExport*>	m_Data;	//!< list of data export classes
+
+	FECoreThreads::Coloring	m_coloring;		//!< assembly coloring
+	std::vector<int>		m_coloringRid;	//!< rigid body ids of the nodes it was built for
+	bool					m_coloringBuilt = false;
 };

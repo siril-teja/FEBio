@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FEBiphasicSolver.h"
 #include "FEBiphasicDomain.h"
 #include <FEBioMech/FESlidingElasticInterface.h>
@@ -685,7 +686,7 @@ void FEBiphasicSolver::UpdateKinematics(vector<double>& ui)
 	// total displacements
 	vector<double> U(m_Ut.size());
 	int U_size = (int)U.size();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 	for (int i = 0; i < U_size; ++i)
 	{
 		U[i] = ui[i] + m_Ui[i] + m_Ut[i];
@@ -718,6 +719,8 @@ void FEBiphasicSolver::UpdateKinematics(vector<double>& ui)
 	// Don't update rigid nodes since they are already updated
 	int NN = mesh.Nodes();
 	{
+		// each node only writes its own data: all requested threads, also in deterministic mode
+		#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 		for (int i = 0; i < NN; ++i)
 		{
 			FENode& node = mesh.Node(i);
@@ -749,16 +752,19 @@ void FEBiphasicSolver::UpdateKinematics(vector<double>& ui)
 //! Updates the poroelastic data
 void FEBiphasicSolver::UpdatePoro(vector<double>& ui)
 {
-    int i, n;
     
 	FEModel& fem = *GetFEModel();
 	FEMesh& mesh = fem.GetMesh();
 	double dt = fem.GetTime().timeIncrement;
 
 	// update poro-elasticity data
-	for (i=0; i<mesh.Nodes(); ++i)
+	// (each node only writes its own data: all requested threads, also in deterministic mode)
+	const int NN = mesh.Nodes();
+	#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
+	for (int i=0; i<NN; ++i)
 	{
 		FENode& node = mesh.Node(i);
+		int n;
 
 		// update nodal pressures
 		n = node.m_ID[m_dofP[0]];
@@ -768,7 +774,8 @@ void FEBiphasicSolver::UpdatePoro(vector<double>& ui)
     }
 
 	// update poro-elasticity data
-	for (i=0; i<mesh.Nodes(); ++i)
+	#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
+	for (int i=0; i<NN; ++i)
 	{
 		FENode& node = mesh.Node(i);
 
@@ -1062,7 +1069,10 @@ void FEBiphasicSolver::ExternalForces(FEGlobalVector& RHS)
     
     // set the nodal reaction forces
     // TODO: Is this a good place to do this?
-    for (int i=0; i<mesh.Nodes(); ++i)
+    // (each node only writes its own data: all requested threads, also in deterministic mode)
+    const int NN = mesh.Nodes();
+    #pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
+    for (int i=0; i<NN; ++i)
     {
         FENode& node = mesh.Node(i);
         node.set_load(m_dofU[0], 0);

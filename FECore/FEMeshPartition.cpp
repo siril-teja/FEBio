@@ -32,6 +32,7 @@ SOFTWARE.*/
 #include <string.h>
 #include "FEModel.h"
 #include "DumpStream.h"
+#include "FELinearConstraintManager.h"
 
 //-----------------------------------------------------------------------------
 FEMeshPartition::FEMeshPartition(int nclass, FEModel* fem) : FECoreBase(fem), m_nclass(nclass)
@@ -185,4 +186,39 @@ void FEMeshPartition::ForEachElement(std::function<void(FEElement& el)> f)
 	{
 		f(ElementRef(i));
 	}
+}
+
+//-----------------------------------------------------------------------------
+const FECoreThreads::Coloring& FEMeshPartition::AssemblyColoring()
+{
+	// The keys are the mesh nodes and, for nodes attached to a rigid body, the rigid body:
+	// its equations and reaction forces are shared by all of its nodes.
+	const int NN = Nodes();
+	std::vector<int> rid(NN);
+	for (int i = 0; i < NN; ++i) rid[i] = Node(i).m_rid;
+	if (!m_coloringBuilt || (rid != m_coloringRid) || (m_coloring.Items() != Elements()))
+	{
+		FEMesh& mesh = *GetMesh();
+		const int nodes = mesh.Nodes();
+		int nrb = 0;
+		for (int r : rid) if (r + 1 > nrb) nrb = r + 1;
+		m_coloring.Build(Elements(), nodes + nrb, [&](int i, std::vector<int>& k) {
+			for (int n : ElementRef(i).m_node)
+			{
+				k.push_back(n);
+				const int r = mesh.Node(n).m_rid;
+				if (r >= 0) k.push_back(nodes + r);
+			}
+		});
+		m_coloringRid.swap(rid);
+		m_coloringBuilt = true;
+	}
+	return m_coloring;
+}
+
+//-----------------------------------------------------------------------------
+bool FEMeshPartition::SerialAssembly() const
+{
+	FEModel* fem = GetFEModel();
+	return (fem && (fem->GetLinearConstraintManager().LinearConstraints() > 0));
 }

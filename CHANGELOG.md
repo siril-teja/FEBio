@@ -12,6 +12,16 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.7] - 2026-11-27
+
+### Performance
+- **Deterministic parallel surface loads and per-node solver loops** (ROADMAP 3.5).
+  - **Surface-load vectors** (`FESurface::LoadVector`, e.g. pressure) use the colored assembly. The coloring cache moved from `FESolidDomain` to `FEMeshPartition`, so domains and surfaces share it.
+  - **Per-node loops** run on all requested threads also in deterministic mode: displacement scatter, nodal positions, the biphasic pressure and velocity update, the nodal reaction loads, the increment update and the start-of-step node update. Each node writes only its own data.
+  - **Springs and rigid-body coupling** stay serial. On Finley 59F L1–L5 (292 springs) they cost about 0.01 s per 6 steps, less than the threading overhead.
+  - **Results:** the pressure-load summation order changed, so results differ in the last bits. They are still bitwise reproducible for any thread count.
+  - **Finley 59F L1–L5, first 6 steps, 4 threads, alternated ×2 against 1.1.4:** residual 3.75/3.85 s → 3.26/3.45 s, model update 3.88/3.74 s → 3.51/3.69 s. The comparison includes the 1.1.6 contact change.
+
 ## [1.1.6] - 2026-11-27
 
 ### Performance
