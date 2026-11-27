@@ -430,6 +430,96 @@ fn lu_small(mut a: MatMut<'_, f64>, eps: f64) -> usize {
     np
 }
 
+/// Run the factorization tasks as a dependency graph: every subtree (a root in
+/// `subtrees`, processed sequentially by `sub`) and every top supernode (`top`, processed
+/// by `topf`) starts as soon as everything it depends on is done. A top supernode
+/// depends on its children, each of which is a top supernode or a subtree root. Each
+/// task's arithmetic does not depend on when it runs, so the result is deterministic.
+/// Falls back to "all subtrees, then the top supernodes in order" if the schedule does
+/// not have that shape.
+pub(crate) fn run_tree<FS, FT>(sym: &Symbolic, subtrees: &[usize], top: &[usize], sub: FS, topf: FT)
+where
+    FS: Fn(usize) + Sync,
+    FT: Fn(usize) + Sync,
+{
+    use rayon::prelude::*;
+    use std::sync::atomic::AtomicU32;
+    const NONE: u32 = u32::MAX;
+    // slot of each top supernode
+    let mut slot = vec![NONE; sym.ns];
+    for (q, &s) in top.iter().enumerate() {
+        slot[s] = q as u32;
+    }
+    let mut is_sub = vec![false; sym.ns];
+    for &r in subtrees {
+        is_sub[r] = true;
+    }
+    // pending children of each top supernode; every child must be top or a subtree root
+    let mut pending = vec![0u32; top.len()];
+    let mut ok = true;
+    for (q, &s) in top.iter().enumerate() {
+        for &c in &sym.sn_children[sym.sn_children_ptr[s]..sym.sn_children_ptr[s + 1]] {
+            if slot[c] == NONE && !is_sub[c] {
+                ok = false;
+            }
+            pending[q] += 1;
+        }
+    }
+    for &r in subtrees {
+        let p = sym.sn_parent[r];
+        if p != usize::MAX && slot[p] == NONE {
+            ok = false;
+        }
+    }
+    if !ok {
+        subtrees.par_iter().with_max_len(1).for_each(|&r| sub(r));
+        for &s in top {
+            topf(s);
+        }
+        return;
+    }
+    let pending: Vec<AtomicU32> = pending.into_iter().map(AtomicU32::new).collect();
+    // finishing a node may make its parent ready
+    fn done<'s, FT: Fn(usize) + Sync>(
+        sc: &rayon::Scope<'s>,
+        sym: &'s Symbolic,
+        slot: &'s [u32],
+        pending: &'s [AtomicU32],
+        topf: &'s FT,
+        node: usize,
+    ) {
+        let p = sym.sn_parent[node];
+        if p == usize::MAX {
+            return;
+        }
+        let q = slot[p] as usize;
+        if pending[q].fetch_sub(1, AO::AcqRel) == 1 {
+            sc.spawn(move |sc| {
+                topf(p);
+                done(sc, sym, slot, pending, topf, p);
+            });
+        }
+    }
+    let (slot, pending, topf, sub) = (&slot, &pending, &topf, &sub);
+    rayon::scope(|sc| {
+        // top supernodes without children (rare) are ready at once
+        for (q, &s) in top.iter().enumerate() {
+            if pending[q].load(AO::Acquire) == 0 {
+                sc.spawn(move |sc| {
+                    topf(s);
+                    done(sc, sym, slot, pending, topf, s);
+                });
+            }
+        }
+        for &r in subtrees {
+            sc.spawn(move |sc| {
+                sub(r);
+                done(sc, sym, slot, pending, topf, r);
+            });
+        }
+    });
+}
+
 pub fn factor(
     sym: &Symbolic,
     lsym: &LuSymbolic,
@@ -461,14 +551,22 @@ pub fn factor(
         par_flops,
         nperturbed: &np,
     };
-    use rayon::prelude::*;
-    sched
-        .0
-        .par_iter()
-        .with_max_len(1)
-        .for_each(|&r| ctx.subtree_seq(r));
-    for &s in &sched.1 {
-        ctx.supernode(s, true);
+    let prof = std::env::var_os("FRS_PROFILE").is_some();
+    let t0 = std::time::Instant::now();
+    run_tree(
+        sym,
+        &sched.0,
+        &sched.1,
+        |r| ctx.subtree_seq(r),
+        |s| ctx.supernode(s, true),
+    );
+    if prof {
+        eprintln!(
+            "lu factor: {} subtrees + {} top supernodes (task graph) {:.3}s",
+            sched.0.len(),
+            sched.1.len(),
+            t0.elapsed().as_secs_f64()
+        );
     }
     LuNumeric {
         l,
