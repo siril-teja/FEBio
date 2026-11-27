@@ -91,6 +91,9 @@ jobs:
                -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache $MKL_CMAKE_ARGS
       - name: Build
         run: cmake --build cmbuild -j $(nproc) && ccache -s
+      - name: Python driver tests
+        if: github.event_name != 'push'
+        run: FEBIO4=cmbuild/bin/febio4 python3 -m unittest discover -s python/tests -v
       - name: Regression (PARDISO vs Rust) and spine smoke test
         if: github.event_name != 'push'
         # both on 2 threads, side by side on the 4-core runner

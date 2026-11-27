@@ -18,7 +18,7 @@ Status as of 2026-11-26 (`main`). Background and results: `rust/README.md`, `rus
 
 | # | Item | Notes |
 |---|---|---|
-| P1 | **Scaling beyond 4 cores** | All benchmarks ran on a 4-core VM. The top of the elimination tree relies on parallel dense kernels, so check 16–64 cores (and NUMA). |
+| P1 | **Scaling beyond 4 cores** | All benchmarks ran on a 4-core VM. The top of the elimination tree relies on parallel dense kernels, so check 8, 16 and 32 cores (and NUMA). |
 | P2 | **Triangular-solve speed at 4 threads** | About 1.4× slower than PARDISO on the n30 block matrix (0.28 s vs 0.19 s). This matters for BFGS runs with many back-solves. The LU solve is sequential. |
 | P3 | **PARDISO wrapper re-analyzes on every Factor()** | `NumCore/PardisoSolver.cpp` runs phase 11 (reordering + symbolic) at each reformation. Running it only on the first `Factor()` after `PreProcess()` measured −30% end to end on Newton runs without contact. It is a C++-only change. |
 | P4 | **Non-solver time** | Profiled end-to-end with `perf`. Candidates:<br>• fiber-direction recomputation: ~9% of samples in fiber-reinforced spine models;<br>• OpenMP spin-wait competing with the Rust solver threads;<br>• the items P6–P9. |

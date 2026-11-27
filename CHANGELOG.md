@@ -12,6 +12,20 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.2.0] - 2026-11-27
+
+### Added
+- **Python driver `febio_rs`** (ROADMAP 2.5), in `python/febio_rs`. Standard library only.
+  - `run()` runs `febio4` with a chosen linear solver, thread count and determinism mode, and returns a `Result`.
+  - `Result` gives the run summary (iterations, reformations, timings), the data blocks logged to the log file, the plot file (`read_xplt`) and the spine QoIs (range of motion, IDP, facet forces).
+  - `set_values()` / `get_value()` edit `.feb` inputs for parameter studies.
+  - CLI: `python -m febio_rs run model.feb --solver rust --qoi`.
+  - The plot-file reader and QoI code moved from `rust/bench` into the package; the benchmark scripts import them through thin shims.
+  - CI runs the package tests, including a check that the plot output is identical for 1 and 2 threads.
+
+### Documentation
+- The scaling study (ROADMAP 2.4, OPEN_ITEMS P1) now targets 4–32 cores instead of 4–64.
+
 ## [1.1.10] - 2026-11-27
 
 ### CI

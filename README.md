@@ -46,6 +46,14 @@ Or use it for every model, via the config file passed with `-cnf`: `<default_lin
 
 Solver options: `nthreads`, `ordering` (0 = METIS, 1 = AMD), `refine`, `pivot_eps`, `print_level`. For an MKL build, see [BUILD.md](BUILD.md) and `ci/rust/setup-mkl.sh`.
 
+From Python (standard library only, see [python/README.md](python/README.md)):
+
+```python
+import febio_rs as fr            # PYTHONPATH=python
+r = fr.run("model.feb", solver="rust", threads=4, check=True)
+r.summary(); r.qoi()             # iterations and timings; range of motion, IDP, facet forces
+```
+
 ## Reproducibility
 
 | Mode | Switch | Output |
@@ -70,6 +78,7 @@ How the deterministic mode works:
 |---|---|
 | `rust/febio_rs_solver/` | Rust solver crate (C ABI, tests) |
 | `NumCore/RustSolver.*` | FEBio wrapper for the Rust solver |
+| `python/febio_rs/` | Python driver: run `febio4`, read log and plot files, spine QoIs ([python/README.md](python/README.md)) |
 | `rust/bench/` | benchmark models, regression and benchmark scripts |
 | `models/` | published spine models (Finley et al. 2018) used for benchmarks |
 | everything else | FEBio (upstream) |
