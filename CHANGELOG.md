@@ -12,6 +12,16 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.2.1] - 2026-11-27
+
+### Documentation
+- **Roadmap: GPU items 3.13–3.15** for the target server (up to 32 cores and one NVIDIA L40).
+  - 3.13: mixed-precision LU, with FP32 factorization and solves on the GPU and FP64 refinement on the CPU.
+  - 3.14: optional cuDSS FP64 solver.
+  - 3.15: overlap CPU assembly with GPU work.
+- The speed target is now measured on up to 32 cores plus the L40.
+- Items 3.2, 3.7 and 3.8 are marked done (#28, #22, #23).
+
 ## [1.2.0] - 2026-11-27
 
 ### Added
