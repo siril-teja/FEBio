@@ -19,7 +19,7 @@ FEBio-Rust is a solid-mechanics fork of [FEBio](https://github.com/febiosoftware
 | | |
 |---|---|
 | **Rust sparse solver** | Supernodal LDLᵀ and LU, multithreaded. It reuses its analysis whenever the sparsity pattern is unchanged. |
-| **Same answers** | Same iteration counts as MKL PARDISO; displacements agree to about 1e-12. |
+| **Same answers** | Same iteration counts as MKL PARDISO. Displacements agree to about 1e-12. On spine models, range of motion, intradiscal pressure and facet contact forces are identical. |
 | **Reproducible** | Byte-identical output on every run (default). With the Rust solver, also for any thread count. |
 | **Gated** | Every change is a pull request; CI checks accuracy, reproducibility and versioning. |
 
@@ -82,7 +82,7 @@ How the deterministic mode works:
 - **CI must pass:**
   - the Rust crate checks;
   - the FEBio build;
-  - the PARDISO-vs-Rust regression (iterations equal, displacements within 1e-9);
+  - the PARDISO-vs-Rust regression: iterations equal, displacements within 1e-9, and spine quantities of interest within tolerance (range of motion, intradiscal pressure, facet contact force);
   - the determinism gate;
   - the PR policy.
 
