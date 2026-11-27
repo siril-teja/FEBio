@@ -44,7 +44,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 2.1 | Finley 2018 lumbar models in `models/` + benchmark driver | ✅ |
 | 2.2 | Trim to the solid mechanics we need (drop fluid, FSI, RVE, optimization) | ✅ #11 |
 | 2.3 | CI smoke test on a published FSU model | ✅ |
-| 2.4 | Scaling study, 4–64 cores and NUMA | ⬜ |
+| 2.4 | Scaling study, 4–32 cores and NUMA | ⬜ |
 | 2.5 | Python driver for the `febio4` executable (run, parse log and plot files) | ✅ |
 | 2.6 | Rust LDLᵀ pivot threshold for stiff/soft mixed systems | ✅ |
 | 2.7 | Rust LU: refine only while it helps | ✅ |

@@ -23,6 +23,9 @@ The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0)
   - The plot-file reader and QoI code moved from `rust/bench` into the package; the benchmark scripts import them through thin shims.
   - CI runs the package tests, including a check that the plot output is identical for 1 and 2 threads.
 
+### Documentation
+- The scaling study (ROADMAP 2.4, OPEN_ITEMS P1) now targets 4–32 cores instead of 4–64.
+
 ## [1.1.10] - 2026-11-27
 
 ### CI
