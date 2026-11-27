@@ -303,8 +303,17 @@ if(USE_RUST_SOLVER)
         set(RUST_SOLVER_SO libfebio_rs_solver.so)
         set(RUST_SOLVER_LIB ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/${RUST_SOLVER_SO})
     endif()
+    # Portable by default: faer selects AVX2/AVX-512 kernels at run time, so a generic
+    # x86-64 build runs at full speed on any CPU and gives bitwise-identical results.
+    # RUST_TARGET_CPU=native (or e.g. x86-64-v3) tunes the rest of the crate for one CPU.
+    set(RUST_TARGET_CPU "" CACHE STRING "Rust target CPU (empty = portable; e.g. native, x86-64-v3)")
+    if(RUST_TARGET_CPU)
+        set(RUST_CARGO_ENV ${CMAKE_COMMAND} -E env "RUSTFLAGS=-C target-cpu=${RUST_TARGET_CPU}")
+    else()
+        set(RUST_CARGO_ENV "")
+    endif()
     add_custom_target(febio_rs_solver_build
-        COMMAND ${CARGO_EXE} build --release --target-dir ${RUST_SOLVER_TARGET_DIR}
+        COMMAND ${RUST_CARGO_ENV} ${CARGO_EXE} build --release --target-dir ${RUST_SOLVER_TARGET_DIR}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${RUST_SOLVER_TARGET_DIR}/release/${RUST_SOLVER_SO} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/
         WORKING_DIRECTORY ${RUST_SOLVER_DIR}

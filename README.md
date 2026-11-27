@@ -44,6 +44,8 @@ Select the Rust solver in a model:
 
 Or use it for every model, via the config file passed with `-cnf`: `<default_linear_solver type="rust"/>`.
 
+The build is portable (generic x86-64; the dense kernels pick AVX2/AVX-512 at run time). `-DRUST_TARGET_CPU=native` tunes the Rust solver for the build machine.
+
 Solver options: `nthreads`, `ordering` (0 = METIS, 1 = AMD), `refine`, `pivot_eps`, `print_level`. For an MKL build, see [BUILD.md](BUILD.md) and `ci/rust/setup-mkl.sh`.
 
 From Python (standard library only, see [python/README.md](python/README.md)):

@@ -12,6 +12,15 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.3.1] - 2026-11-27
+
+### Build
+- **Portable builds by default** (ROADMAP 3.9).
+  - The Rust solver was built with `target-cpu=native` (`rust/febio_rs_solver/.cargo/config.toml`), so a binary could fail with an illegal instruction on a different CPU. It now builds for generic x86-64. faer's dense kernels select AVX2/AVX-512 at run time, so the same binary runs at full speed anywhere.
+  - Measured on the Finley 59F L1–L5 matrix at 4 threads, the generic build gives a bitwise-identical solution (same hash). Factorization is 3.37–3.41 s vs 3.25–3.35 s native; solve is 0.158–0.162 s vs 0.164–0.168 s.
+  - `-DRUST_TARGET_CPU=native` (or e.g. `x86-64-v3`) restores a host-tuned build.
+  - CI no longer sets `target-cpu`.
+
 ## [1.3.0] - 2026-11-27
 
 ### Added

@@ -1,4 +1,0 @@
-# Build for the host CPU so the dense kernels use AVX2/AVX-512 where available
-# (MKL dispatches to the best ISA at runtime; this keeps the comparison fair).
-[build]
-rustflags = ["-C", "target-cpu=native"]
