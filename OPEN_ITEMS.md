@@ -12,7 +12,7 @@ Status as of 2026-11-26 (`main`). Background and results: `rust/README.md`, `rus
 | V2 | **Literature comparison at the right level** | The ROM corridor used (Niosi et al. 2006) is for L3–L4 and the surrogate is uncalibrated. Its ROM lies within about 1.3 SD (flexion within 1 SD). | Use L4–L5 in-vitro data at ±7.5 N·m (e.g. Heuer et al. 2007, from tables) once the published model is in. |
 | V3 | **Saddle-point / indefinite systems** | The symmetric LDLᵀ uses static pivot perturbation without Bunch–Kaufman pivoting. It is not yet validated on Lagrange-multiplier contact or mixed u–p elements. | Add models with `laugon` = Lagrange multipliers and u–p (`three-field`) elements to `ci_regression.py`. Add intra-supernode 2×2 pivoting if needed. |
 | V4 | **Solid-mechanics coverage** | Since 1.0.0 the fork keeps solids, rigid bodies, contact, springs and biphasic; fluid, FSI, RVE and optimization are removed. The regression set covers hex8/hex20 solids, fiber mixtures, rigid bodies, sliding-elastic (frictionless and frictional) and sliding2 contact, biphasic and springs. Shells, beams, prestrain and follower pressure are untested. | Add one small model each to `ci_regression.py`. |
-| V5 | **FEBio's official test suite** | `ci/Linux/test.sh` expects `TestSuite/` (separate repo, not in this fork). | Obtain the test suite and run it with `linear_solver type="rust"` as default. |
+| V5 | **FEBio's official test suite** | Upstream's `TestSuite/` is a separate repository, not in this fork. | Obtain the test suite and run it with `linear_solver type="rust"` as default. |
 
 ## Performance
 
@@ -36,7 +36,7 @@ Status as of 2026-11-26 (`main`). Background and results: `rust/README.md`, `rus
 
 | # | Item | Notes |
 |---|---|---|
-| E1 | **Upstream FEBio workflows stay pending in this fork** | `*-pull-request.yml` call `febiosoftware/febio-workflows` with upstream secrets and runners. Decide whether to disable them in the fork. `Rust solver CI` is the active gate. |
+| E1 | ~~Upstream FEBio workflows stay pending in this fork~~ **Done** | Removed in favor of the Linux-only `Rust solver CI` and `PR policy` workflows. | — |
 | E2 | **MKL CMake integration** | `FindDependencies.cmake`/`CMakeLists.txt` only look for `lib*.a`. CI uses `ci/rust/setup-mkl.sh` (symlinks `.so` under `.a` names, MKL 2024.2 pinned because 2025 dropped `mkl_dcsrtrsv`). A proper `.so` search would be cleaner. |
 | E3 | **Static linking of the Rust crate** | faer's x86 gemm crashes when its static archive is embedded in `libnumcore.so`, so the crate is a `cdylib`. Revisit with newer faer and file upstream. |
 | E4 | **Portability** | The crate builds with `-C target-cpu=native`. Release binaries need a portable target (or runtime dispatch). Windows/macOS builds of the Rust path are untested. |
