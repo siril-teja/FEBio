@@ -12,6 +12,12 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.9] - 2026-11-27
+
+### Documentation
+- **Benchmarks: full Finley 59F L1–L5 rerun with 1.1.8.** FEBio-Rust 884 s vs native 975 s: 1.10× (1.05× with 1.1.4). Range of motion, IDP and facet forces identical.
+- **Linear-solver limits recorded:** factorization runs near dense-kernel peak, the solves at memory bandwidth. Mixed precision was rejected: refinement needs 7–8 solves per right-hand side.
+
 ## [1.1.8] - 2026-11-27
 
 ### Performance
