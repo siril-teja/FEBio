@@ -3,8 +3,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(FEBio)
-set(FEBIO_LIBS FEBioFluid FEBioLib FEBioMech FEBioMix FEBioOpt FECore NumCore FEAMR FEBioRVE FEImgLib FEBioPlot FEBioXML)
-set(STATIC_FEBIO_LIBS FEBioTest febcode)
+set(FEBIO_LIBS FEBioLib FEBioMech FEBioMix FECore NumCore FEAMR FEBioPlot FEBioXML)
+set(STATIC_FEBIO_LIBS febcode)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -81,15 +81,6 @@ if(USE_MKL)
     endif()
 endif()
 
-if(USE_FFTW)
-	if(NOT EXISTS ${FFTW_LIB})
-		message(SEND_ERROR "Could not find FFTW library libfftw3-3. Check FFTW_LIB.")
-        message(SEND_ERROR "The library is " ${FFTW_LIB})
-	endif()
-	if(NOT EXISTS ${FFTW_INC}/fftw3.h)
-		message(SEND_ERROR "Could not find fftw3.h. Check FFTW_INC.")
-	endif()
-endif()
 
 if(USE_HYPRE)
 	if(NOT EXISTS ${HYPRE_LIB})
@@ -121,23 +112,7 @@ if(USE_MMG)
 	endif()
 endif()
 
-if(USE_LEVMAR)
-	if(NOT EXISTS ${LEVMAR_INC}/levmar.h)
-		message(SEND_ERROR "Could not find levmar.h. Check LEVMAR_INC.")
-	endif()
-	if(NOT EXISTS ${LEVMAR_LIB})
-		message(SEND_ERROR "Could not find Levmar library. Check LEVMAR_LIB.")
-	endif()
-endif()
 
-if(USE_NLOPT)
-	if(NOT EXISTS ${NLOPT_INC}/nlopt.h)
-		message(SEND_ERROR "Could not find nlopt.h. Check NLOPT_INC.")
-	endif()
-	if(NOT EXISTS ${NLOPT_LIB})
-		message(SEND_ERROR "Could not find NLOPT library. Check NLOPT_LIB.")
-	endif()
-endif()
 
 if(USE_ZLIB)
 	if(NOT EXISTS ${ZLIB_LIBRARY_RELEASE})
@@ -218,17 +193,12 @@ add_executable (febio4 ${HEADERS} ${SOURCES})
 
 if(WIN32)
     target_compile_options(febio4 PRIVATE /openmp)
-    target_compile_options(febiofluid PRIVATE /openmp)
     target_compile_options(febiolib PRIVATE /openmp)
     target_compile_options(febiomech PRIVATE /openmp)
     target_compile_options(febiomix PRIVATE /openmp)
-    target_compile_options(febioopt PRIVATE /openmp)
     target_compile_options(fecore PRIVATE /openmp)
     target_compile_options(feamr PRIVATE /openmp)
-    target_compile_options(febiorve PRIVATE /openmp)
-    target_compile_options(feimglib PRIVATE /openmp)
     target_compile_options(febioplot PRIVATE /openmp)
-    target_compile_options(febiotest PRIVATE /openmp)
     target_compile_options(febioxml PRIVATE /openmp)
 endif()
 
@@ -292,26 +262,8 @@ mark_as_advanced(EXTRA_INC)
 ##### Setup includes, defnitions, and linking options #####
 include_directories(${PROJECT_SOURCE_DIR})
 
-# Link LEVMAR
-if(USE_LEVMAR)
-	target_include_directories(febioopt PRIVATE ${LEVMAR_INC})
-    target_compile_definitions(febioopt PRIVATE HAVE_LEVMAR)
-    target_link_libraries(febioopt PRIVATE ${LEVMAR_LIB})
-endif()
 
-# Link NLOPT
-if(USE_NLOPT)
-	target_include_directories(febioopt PRIVATE ${NLOPT_INC})
-    target_compile_definitions(febioopt PRIVATE HAVE_NLOPT)
-    target_link_libraries(febioopt PRIVATE ${NLOPT_LIB})
-endif()
 
-# Link FFTW
-if(USE_FFTW)
-    target_include_directories(feimglib PRIVATE ${FFTW_INC})
-    target_compile_definitions(feimglib PRIVATE HAVE_FFTW)
-    target_link_libraries(feimglib PRIVATE ${FFTW_LIB})
-endif()
 
 # Link HYPRE
 if(USE_HYPRE)
@@ -372,8 +324,6 @@ if(USE_MKL)
     target_include_directories(numcore PRIVATE ${MKL_INC} ${OpenMP_C_LIBRARIES})
     target_compile_definitions(numcore PRIVATE MKL_ISS PARDISO)
     
-    target_include_directories(febioopt PRIVATE ${MKL_INC})
-	target_compile_definitions(febioopt PRIVATE MKL_ISS PARDISO)
 
     # macOS: use LLVM's libomp (the runtime matching Apple clang) for MKL too,
     # so only one OpenMP runtime is ever loaded. The oneAPI 2023 libiomp5 lacks
@@ -384,21 +334,17 @@ if(USE_MKL)
 
     if(WIN32 OR APPLE)
         target_link_libraries(numcore PRIVATE ${MKL_OMP_LIB} ${MKL_LIBS})
-        target_link_libraries(febioopt PRIVATE ${MKL_OMP_LIB} ${MKL_LIBS})
     else()
         target_link_libraries(numcore PRIVATE -Wl,--start-group ${MKL_OMP_LIB} ${MKL_LIBS} -Wl,--end-group)
-        target_link_libraries(febioopt PRIVATE -Wl,--start-group ${MKL_OMP_LIB} ${MKL_LIBS} -Wl,--end-group)
     endif()
     
     if(FORCE_SYSTEM_OMP)
         target_link_libraries(numcore PRIVATE ${OpenMP_C_LIBRARIES})
-        target_link_libraries(febioopt PRIVATE ${OpenMP_C_LIBRARIES})
     endif()
 else()
     # If not using MKL, we still need OpenMP from the system.
     if(${OpenMP_C_FOUND})
         target_link_libraries(numcore PRIVATE ${OpenMP_C_LIBRARIES})
-        target_link_libraries(febioopt PRIVATE ${OpenMP_C_LIBRARIES})
     endif()
 endif()
 
@@ -433,7 +379,6 @@ elseif(USE_PDL)
     # We still need OpenMP from the system.
     if(${OpenMP_C_FOUND})
         target_link_libraries(numcore PRIVATE ${OpenMP_C_LIBRARIES})
-        target_link_libraries(febioopt PRIVATE ${OpenMP_C_LIBRARIES})
     endif()
 endif()
 
@@ -457,7 +402,6 @@ if(USE_ZLIB)
 endif()
 
 # Extra Includes
-target_include_directories(febioopt PRIVATE ${EXTRA_INC})
 target_include_directories(numcore PRIVATE ${EXTRA_INC})
 target_include_directories(feamr PRIVATE ${EXTRA_INC})
 target_include_directories(febiolib PRIVATE ${EXTRA_INC})
@@ -481,18 +425,12 @@ endif()
 # Link Libraries into FEBioLib
 target_link_libraries(numcore PRIVATE fecore)
 target_link_libraries(febioxml PRIVATE fecore)
-target_link_libraries(febiotest PRIVATE fecore)
 target_link_libraries(febioplot PRIVATE fecore)
-target_link_libraries(feimglib PRIVATE fecore)
 target_link_libraries(feamr PRIVATE fecore)
-target_link_libraries(febiorve PRIVATE fecore febiomech febioxml febioplot)
-target_link_libraries(febioopt PRIVATE fecore febioxml febioplot)
-target_link_libraries(febiomix PRIVATE febiomech fecore)
 target_link_libraries(febiomech PRIVATE fecore feamr)
-target_link_libraries(febiofluid PRIVATE febiomix febiomech fecore)
 
-target_link_libraries(febiolib PRIVATE febioplot febiomech 
-		febiomix febioxml numcore febioopt febiotest febiofluid feamr febiorve fecore feimglib)
+target_link_libraries(febiomix PRIVATE febiomech fecore)
+target_link_libraries(febiolib PRIVATE febioplot febiomech febiomix febioxml numcore feamr fecore)
 
 # pull febcode into FECore
 target_link_libraries(fecore PRIVATE febcode)
@@ -508,14 +446,9 @@ else()
     if(USE_STATIC_STDLIBS)
         target_link_libraries(numcore PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febioxml PRIVATE -static-libstdc++ -static-libgcc)
-        target_link_libraries(febiotest PRIVATE -static-libstdc++ -static-libgcc)
-        target_link_libraries(febiorve PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febioplot PRIVATE -static-libstdc++ -static-libgcc)
-        target_link_libraries(febioopt PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febiomix PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febiomech PRIVATE -static-libstdc++ -static-libgcc)
-        target_link_libraries(febiofluid PRIVATE -static-libstdc++ -static-libgcc)
-        target_link_libraries(feimglib PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(feamr PRIVATE -static-libstdc++ -static-libgcc)
         target_link_libraries(febiolib PRIVATE -static-libstdc++ -static-libgcc stdc++fs)
         target_link_libraries(fecore PRIVATE -static-libstdc++ -static-libgcc stdc++fs)
@@ -532,16 +465,15 @@ else()
 endif()
 
 #### Set up installation #####
-install(TARGETS febio4 numcore febioxml febiotest febiorve febioplot febioopt
-    febiomix febiomech febiofluid feamr feimglib fecore febiolib
+install(TARGETS febio4 numcore febioxml febioplot
+    febiomech febiomix feamr fecore febiolib
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     )
 
 install(DIRECTORY 
-    FEBio NumCore FECore FEAMR FEImgLib FEBioFluid FEBioLib FEBioMech FEBioMix
-    FEBioOpt FEBioRVE FEBioPlot FEBioTest FEBioXML
+    FEBio NumCore FECore FEAMR FEBioLib FEBioMech FEBioMix FEBioPlot FEBioXML
     DESTINATION include
     FILES_MATCHING PATTERN "*.h*"
     )

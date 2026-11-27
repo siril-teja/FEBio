@@ -14,14 +14,10 @@ sdkDirs=(
     FECore
     FEBioMech
     FEBioMix
-    FEBioFluid
-    FEBioRVE
     FEBioPlot
     FEBioXML
     FEBioLib
     FEAMR
-    FEBioOpt
-    FEImgLib
 )
 
 for item in ${sdkDirs[@]}; do

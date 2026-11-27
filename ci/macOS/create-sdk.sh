@@ -12,28 +12,20 @@ sdkDirs=(
     FECore
     FEBioMech
     FEBioMix
-    FEBioFluid
-    FEBioRVE
     FEBioPlot
     FEBioXML
     FEBioLib
     FEAMR
-    FEBioOpt
-    FEImgLib
 )
 
 sdkLibs=(
     libfecore.dylib
     libfebiomech.dylib
     libfebiomix.dylib
-    libfebiofluid.dylib
-    libfebiorve.dylib
     libfebioplot.dylib
     libfebioxml.dylib
     libfebiolib.dylib
     libfeamr.dylib
-    libfebioopt.dylib
-    libfeimglib.dylib
 )
 
 for item in ${sdkDirs[@]}; do

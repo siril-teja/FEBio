@@ -12,7 +12,7 @@
 
 </div>
 
-FEBio-Rust is a fork of [FEBio](https://github.com/febiosoftware/FEBio). It reads the same input files and gives the same answers, with a parallel linear solver written in Rust. The goal is the fastest open-source solver for spine models on bare-metal multicore machines; see the [roadmap](ROADMAP.md).
+FEBio-Rust is a solid-mechanics fork of [FEBio](https://github.com/febiosoftware/FEBio). It reads the same input files and gives the same answers, with a parallel linear solver written in Rust. The goal is the fastest open-source solver for spine models on bare-metal multicore machines; see the [roadmap](ROADMAP.md).
 
 ## Highlights
 
@@ -57,6 +57,12 @@ How the deterministic mode works:
 - **Element loops:** element matrices are computed in parallel and added to the global system in element order, so the result is exactly the serial one.
 - **Rust solver:** its arithmetic does not depend on thread scheduling.
 - **PARDISO:** runs in MKL's reproducible (CNR) mode.
+
+## Scope
+
+**Kept:** FECore, FEBioMech (solids, rigid bodies, contact, springs), FEBioMix (biphasic and the `sliding2` contact used by published spine models), FEBioXML, FEBioPlot, NumCore, FEAMR, FEBioLib, `febio4`.
+
+**Removed (1.0.0):** fluid/FSI, multiscale (RVE), optimization, image analysis and material diagnostics. Use upstream FEBio for those.
 
 ## Repository
 

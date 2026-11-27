@@ -9,12 +9,8 @@ cmake_minimum_required(VERSION 3.15)
 #     FEBio::FEAMR
 #     FEBio::FEBioLib
 #     FEBio::FEBioMech
-#     FEBio::FEBioOpt
-#     FEBio::FEBioRVE
 #     FEBio::FECore
-#     FEBio::FEImgLib
 #     FEBio::FEBioPlot
-#     FEBio::FEBioTest
 #     FEBio::FEBioXML
 # ------------------------------------------------------------------------------
 
@@ -26,14 +22,10 @@ set(_FEBIO_LIBS
     FECore
     FEBioMech
     FEBioMix
-    FEBioFluid
-    FEBioRVE
     FEBioPlot
     FEBioXML
     FEBioLib
     FEAMR
-    FEBioOpt
-    FEImgLib
 )
 
 # ------------------------------------------------------------------------------

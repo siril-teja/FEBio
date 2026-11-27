@@ -11,7 +11,8 @@ model ingredients that dominate solver cost in published FEBio spine models:
     bonded to the vertebrae via rigid node sets,
   * left/right facet joints: cartilage pads with sliding-elastic contact,
   * seven ligament groups as tension-only springs (ALL, PLL, LF, ISL, SSL, ITL, CL),
-  * optional biphasic disc (unsymmetric system, transient creep).
+  * optional biphasic disc (unsymmetric system, transient creep),
+  * optional facet friction (--friction mu, non-symmetric) and contact algorithm (--contact).
 
 Coordinates in mm (x lateral/right, y anterior, z superior), forces in N, moments N*mm,
 stress MPa.
@@ -134,9 +135,15 @@ def main():
     ap.add_argument("--solver", default="pardiso")
     ap.add_argument("--steps", type=int, default=10)
     ap.add_argument("--biphasic", action="store_true")
+    ap.add_argument("--contact", default="sliding-elastic", choices=["sliding-elastic", "sliding2"],
+                    help="facet contact algorithm (sliding2 is the one the Finley 2018 models use)")
+    ap.add_argument("--friction", type=float, default=0.0,
+                    help="facet friction coefficient (sliding-elastic); > 0 gives a non-symmetric system")
     ap.add_argument("--newton", action="store_true")
     ap.add_argument("-o", required=True)
     a = ap.parse_args()
+    if a.friction and a.contact == "sliding2":
+        ap.error("--friction needs --contact sliding-elastic")
     stem = os.path.splitext(os.path.basename(a.o))[0]
 
     m = Mesh()
@@ -170,13 +177,18 @@ def main():
     w = L.append
     w('<?xml version="1.0" encoding="ISO-8859-1"?>')
     w('<febio_spec version="4.0">')
-    w(f'<Module type="{"biphasic" if a.biphasic else "solid"}"/>')
+    # sliding2 (FESlidingInterface2) is registered under FEBio 4's biphasic module
+    bp_module = a.biphasic or a.contact == "sliding2"
+    w(f'<Module type="{"biphasic" if bp_module else "solid"}"/>')
     w('<Control>')
-    w(f'<analysis>{"TRANSIENT" if a.biphasic else "STATIC"}</analysis>')
+    # a biphasic-module model without biphasic materials runs steady-state with the biphasic
+    # solver; that is how FEBio 4 runs the Finley 2018 sliding2 models
+    w(f'<analysis>{"TRANSIENT" if a.biphasic else "STEADY-STATE" if bp_module else "STATIC"}</analysis>')
     w(f'<time_steps>{a.steps}</time_steps><step_size>{1.0 / a.steps}</step_size>')
-    w(f'<solver type="{"biphasic" if a.biphasic else "solid"}">')
+    w(f'<solver type="{"biphasic" if bp_module else "solid"}">')
+    sym = a.friction == 0.0
     if not a.biphasic:
-        w('<symmetric_stiffness>symmetric</symmetric_stiffness>')
+        w(f'<symmetric_stiffness>{"symmetric" if sym else "non-symmetric"}</symmetric_stiffness>')
     w('<max_refs>25</max_refs><dtol>0.001</dtol><etol>0.01</etol><rtol>0</rtol><lstol>0.9</lstol>')
     w(f'<qn_method type="BFGS"><max_ups>{0 if a.newton else 10}</max_ups></qn_method>')
     w(f'<linear_solver type="{a.solver}"/>')
@@ -268,10 +280,17 @@ def main():
 
     w('<Contact>')
     for side in ("R", "L"):
+        if a.contact == "sliding2":
+            # FESlidingInterface2 (FEBioMix), frictionless; settings as in Finley et al. 2018
+            w(f'<contact name="facet{side}" type="sliding2" surface_pair="facet{side}">'
+              '<laugon>PENALTY</laugon><penalty>1</penalty><auto_penalty>1</auto_penalty><two_pass>1</two_pass>'
+              '<symmetric_stiffness>1</symmetric_stiffness><search_tol>0.01</search_tol><search_radius>5</search_radius>'
+              '<seg_up>0</seg_up></contact>')
+            continue
         w(f'<contact name="facet{side}" type="sliding-elastic" surface_pair="facet{side}">'
           '<laugon>PENALTY</laugon><penalty>1</penalty><auto_penalty>1</auto_penalty><two_pass>0</two_pass>'
-          '<symmetric_stiffness>1</symmetric_stiffness><search_tol>0.01</search_tol><search_radius>5</search_radius>'
-          '<tension>0</tension><fric_coeff>0</fric_coeff></contact>')
+          f'<symmetric_stiffness>{1 if sym else 0}</symmetric_stiffness><search_tol>0.01</search_tol><search_radius>5</search_radius>'
+          f'<tension>0</tension><fric_coeff>{a.friction:g}</fric_coeff></contact>')
     w('</Contact>')
 
     w('<Discrete>')
