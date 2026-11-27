@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.4.0] - 2026-11-27
+
+### Added
+- **Parallel parameter sweeps and load cases from Python** (ROADMAP 5.3).
+  - `febio_rs.grid({path: [values]})` builds the cartesian product of `.feb` edits.
+  - `febio_rs.sweep(feb, cases, workdir, threads, jobs)` runs one edited copy per case, `jobs` at a time with `threads` each (e.g. 8 × 4 on 32 cores), and returns the results in case order.
+  - Every run is deterministic, so results do not depend on `jobs`. A test checks that parallel and sequential sweeps give identical plot data.
+
 ## [1.3.1] - 2026-11-27
 
 ### Build

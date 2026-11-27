@@ -18,6 +18,14 @@ for c1 in (0.05, 0.1, 0.2):
     print(c1, fr.run(f, solver="rust").qoi()["rom_deg"])
 ```
 
+Parameter sweeps and load cases run side by side, e.g. 8 runs × 4 threads on 32 cores:
+
+```python
+cases = fr.grid({"Material/material[@name='nucleus']/c1": [0.05, 0.1, 0.2],
+                 "Control/time_steps": [50, 100]})
+results = fr.sweep("model.feb", cases, "runs", threads=4, jobs=8)   # Results in case order
+```
+
 - **Finding `febio4`:** `febio=` argument, then `$FEBIO4`, then `febio4` on `PATH`, then `build/bin` or `cmbuild/bin` in the repository.
 - **`run` options:**
   - `solver` writes a config file with that default linear solver; without it the model's own setting is used.

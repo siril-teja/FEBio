@@ -39,7 +39,10 @@ class Result:
     def log(self):
         """Text of the log file ('' if there is none)."""
         if self._log is None:
-            self._log = open(self.log_path, encoding="latin-1").read() if os.path.exists(self.log_path) else ""
+            self._log = ""
+            if os.path.exists(self.log_path):
+                with open(self.log_path, encoding="latin-1") as f:
+                    self._log = f.read()
         return self._log
 
     @property

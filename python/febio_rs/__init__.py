@@ -7,6 +7,7 @@
     r.plot()      # plot file (last state): variables, domains, surfaces
     r.qoi()       # spine quantities of interest: range of motion, IDP, facet forces
     fr.set_values("model.feb", "stiff.feb", {"Control/time_steps": 20})
+    rs = fr.sweep("model.feb", fr.grid({"Control/time_steps": [10, 20]}), "runs", threads=4)
 
 Standard library only. See python/README.md.
 """
@@ -14,8 +15,9 @@ from .feb import get_value, set_values
 from .log import data, summary
 from .qoi import compare, qoi
 from .run import Result, find_febio, run
+from .sweep import grid, sweep
 from .xplt import read_xplt
 
 __all__ = ["run", "Result", "find_febio", "summary", "data", "read_xplt", "qoi", "compare",
-           "set_values", "get_value"]
-__version__ = "0.1.0"
+           "set_values", "get_value", "grid", "sweep"]
+__version__ = "0.2.0"
