@@ -4,7 +4,7 @@
 
 **Fast, reproducible nonlinear finite elements for spine biomechanics.**
 
-[![Rust solver CI](https://github.com/siril-teja/FEBio-Rust/actions/workflows/rust-solver-ci.yml/badge.svg?branch=main)](https://github.com/siril-teja/FEBio-Rust/actions/workflows/rust-solver-ci.yml)
+[![Rust solver CI](https://github.com/siril-teja/FEBio-Rust/actions/workflows/rust-solver-ci.yml/badge.svg)](https://github.com/siril-teja/FEBio-Rust/actions/workflows/rust-solver-ci.yml)
 [![PR policy](https://github.com/siril-teja/FEBio-Rust/actions/workflows/pr-policy.yml/badge.svg)](https://github.com/siril-teja/FEBio-Rust/actions/workflows/pr-policy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 

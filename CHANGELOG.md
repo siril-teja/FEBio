@@ -12,6 +12,17 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.1] - 2026-11-27
+
+### CI
+- **Linux only:** removed the upstream FEBio Linux, macOS and Windows workflows and the release-tag workflow. They needed `febiosoftware` infrastructure and never ran in this fork. Also removed their scripts: `ci/Linux`, `ci/macOS`, `ci/Windows`, the plugin scripts and `ci/febio.xml`.
+- **`Rust solver CI`:**
+  - runs once per pull request into `main`; there are no more duplicate push runs. A merge to `main` only rebuilds, without tests, to refresh the caches that later PRs restore;
+  - skips documentation-only changes;
+  - runs the crate and FEBio jobs in parallel;
+  - caches compiled Rust dependencies, using a portable `x86-64-v3` target in CI, plus ccache C++ objects and the MKL download;
+  - installs only `ccache` from apt.
+
 ## [1.1.0] - 2026-11-27
 
 ### Added
