@@ -57,7 +57,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 3.1 | Cheaper restart snapshot per time step | ⬜ |
 | 3.2 | Reuse the stiffness sparsity pattern across time steps | ⬜ |
 | 3.3 | Type-tag material point lookup (no `dynamic_cast`) | ⬜ |
-| 3.4 | Deterministic parallel contact | ⬜ |
+| 3.4 | Deterministic parallel contact | ✅ |
 | 3.5 | Deterministic parallel springs, rigid bodies and surface loads | ⬜ |
 | 3.6 | Faster contact search (spatial index) | ⬜ |
 | 3.7 | Parallel triangular solve | ⬜ |
