@@ -24,6 +24,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 #include "stdafx.h"
+#include "fecore_threads.h"
 #include <assert.h>
 #include "vector.h"
 #include "FEMesh.h"
@@ -163,7 +164,7 @@ void scatter(vector<double>& v, FEMesh& mesh, int ndof)
 void scatter3(vector<double>& v, FEMesh& mesh, int ndof1, int ndof2, int ndof3)
 {
 	const int NN = mesh.Nodes();
-#pragma omp parallel for 
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 	for (int i = 0; i<NN; ++i)
 	{
 		FENode& node = mesh.Node(i);

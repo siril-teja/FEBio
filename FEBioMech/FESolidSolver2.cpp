@@ -27,6 +27,7 @@ SOFTWARE.*/
 
 
 #include "stdafx.h"
+#include <FECore/fecore_threads.h>
 #include "FESolidSolver2.h"
 #include "FERigidConnector.h"
 #include "FESlidingElasticInterface.h"
@@ -492,7 +493,7 @@ void FESolidSolver2::UpdateKinematics(vector<double>& ui)
 	// total displacements
 	vector<double> U(m_Ut.size());
 	int U_size = (int)U.size();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 	for (int i = 0; i < U_size; ++i)
 	{
 		U[i] = ui[i] + m_Ui[i] + m_Ut[i];
@@ -526,7 +527,7 @@ void FESolidSolver2::UpdateKinematics(vector<double>& ui)
 	// Update the spatial nodal positions
 	// Don't update rigid nodes since they are already updated
 	int NN = mesh.Nodes();
-	#pragma omp parallel
+	#pragma omp parallel num_threads(FECoreThreads::RequestedThreads())
 	{
 		#pragma omp for
 		for (int i = 0; i < NN; ++i)
@@ -664,7 +665,7 @@ void FESolidSolver2::UpdateIncrements(vector<double>& Ui, vector<double>& ui, bo
         
 	// update flexible nodes
 	int NN = mesh.Nodes();
-#pragma omp parallel for 
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 	for (int i=0; i<NN; ++i)
 	{
 		FENode& node = mesh.Node(i);
@@ -870,7 +871,7 @@ void FESolidSolver2::PrepStep()
 		// store previous mesh state
 		// we need them for velocity and acceleration calculations
 		int NN = mesh.Nodes();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 		for (int i = 0; i < NN; ++i)
 		{
 			FENode& ni = mesh.Node(i);
@@ -1624,7 +1625,7 @@ void FESolidSolver2::ExternalForces(FEGlobalVector& RHS)
 	// set the nodal reaction forces
 	// TODO: Is this a good place to do this?
 	int NN = mesh.Nodes();
-#pragma omp parallel for
+#pragma omp parallel for num_threads(FECoreThreads::RequestedThreads())
 	for (int i = 0; i<NN; ++i)
 	{
 		FENode& node = mesh.Node(i);

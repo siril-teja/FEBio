@@ -2419,14 +2419,15 @@ void FESurface::LoadVector(FEGlobalVector& R, const FEDofList& dofList, bool bre
 	int dofPerNode = dofList.Size();
 	int order = (dofPerNode == 1 ? dofList.InterpolationOrder(0) : -1);
 
-	int NE = Elements();
-	#pragma omp parallel for shared(R, dofList, f)
-	for (int i = 0; i < NE; ++i)
-	{
-		vector<double> fe;
-		vector<int> lm;
+	// element vectors are computed and assembled color by color (deterministic, see
+	// FECoreThreads::ComputeAndAssembleColored)
+	struct Item { vector<double> fe; vector<int> lm; std::vector<double> G; };
+	FECoreThreads::ComputeAndAssembleColored<Item>(AssemblyColoring(),
+		[&](int i, Item& it) {
+		vector<double>& fe = it.fe;
 		vec3d re[FEElement::MAX_NODES];
-		std::vector<double> G(dofPerNode, 0.0);
+		std::vector<double>& G = it.G;
+		G.assign(dofPerNode, 0.0);
 
 		// get the next element
 		FESurfaceElement& el = Element(i);
@@ -2480,11 +2481,12 @@ void FESurface::LoadVector(FEGlobalVector& R, const FEDofList& dofList, bool bre
 		}
 
 		// get the corresponding LM vector
-		UnpackLM(el, dofList, lm);
-
-		// Assemble into global vector
-		R.Assemble(el.m_node, lm, fe);
-	}
+		UnpackLM(el, dofList, it.lm);
+		},
+		[&](int i, Item& it) {
+			// Assemble into global vector
+			R.Assemble(Element(i).m_node, it.lm, it.fe);
+		}, SerialAssembly());
 }
 
 //-----------------------------------------------------------------------------
