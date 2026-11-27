@@ -92,6 +92,6 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 |---|---|---|
 | 5.1 | SIMD and batched element kernels | ⬜ |
 | 5.2 | NUMA-aware memory and thread placement | ⬜ |
-| 5.3 | Parallel load cases and parameter sweeps from Python | ⬜ |
+| 5.3 | Parallel load cases and parameter sweeps from Python | ✅ |
 | 5.4 | Rust core becomes the default; C++ kept as reference only | ⬜ |
 | 5.5 | Target check: ≥ 5× on up to 32 cores + L40, accuracy and determinism held | ⬜ |

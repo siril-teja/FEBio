@@ -53,10 +53,23 @@ class TestRun(unittest.TestCase):
             self.assertEqual(pa.states, pb.states)       # bitwise equal for 1 and 2 threads
             self.assertIn("displacement", [v[0] for v in pa.vars])
 
+    def test_sweep_matches_sequential_runs(self):
+        with tempfile.TemporaryDirectory() as d:
+            feb = make_model(d, steps=2)
+            cases = fr.grid({"Control/time_steps": [1, 2]})
+            self.assertEqual(cases, [{"Control/time_steps": 1}, {"Control/time_steps": 2}])
+            par = fr.sweep(feb, cases, os.path.join(d, "par"), threads=1, jobs=2)
+            seq = fr.sweep(feb, cases, os.path.join(d, "seq"), threads=1, jobs=1)
+            self.assertTrue(all(r.ok for r in par + seq))
+            self.assertEqual([len(r.plot(last_only=False).states) for r in par], [2, 3])
+            for a, b in zip(par, seq):
+                self.assertEqual(a.plot(last_only=False).states, b.plot(last_only=False).states)
+
     def test_failure_is_reported(self):
         with tempfile.TemporaryDirectory() as d:
             bad = os.path.join(d, "bad.feb")
-            open(bad, "w").write("<febio_spec version='4.0'><Nonsense/></febio_spec>")
+            with open(bad, "w") as f:
+                f.write("<febio_spec version='4.0'><Nonsense/></febio_spec>")
             r = fr.run(bad, workdir=d)
             self.assertFalse(r.ok)
             with self.assertRaises(RuntimeError):
