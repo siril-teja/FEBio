@@ -77,6 +77,30 @@ void FECoreThreads::SetDeterministic(bool b)
 	apply();
 }
 
+int FECoreThreads::ThreadNum()
+{
+#ifdef _OPENMP
+	return omp_get_thread_num();
+#else
+	return 0;
+#endif
+}
+
+int FECoreThreads::TeamSize()
+{
+#ifdef _OPENMP
+	return omp_get_num_threads();
+#else
+	return 1;
+#endif
+}
+
+bool FECoreThreads::StaticAssembly()
+{
+	static const bool b = [] { const char* s = getenv("FEBIO_ASM_STATIC"); return s && (s[0] == '1'); }();
+	return b;
+}
+
 bool FECoreThreads::IsDeterministic()
 {
 	initOnce();

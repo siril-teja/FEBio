@@ -55,6 +55,13 @@ namespace FECoreThreads {
 	//! The number of threads requested by the user. Parallel linear solvers use this.
 	FECORE_API int RequestedThreads();
 
+	//! Thread number and team size of the calling thread (0 and 1 outside a parallel region).
+	FECORE_API int ThreadNum();
+	FECORE_API int TeamSize();
+
+	//! Temporary experiment switch for the colored assembly (FEBIO_ASM_STATIC=1).
+	FECORE_API bool StaticAssembly();
+
 	//! Switch deterministic mode on/off.
 	FECORE_API void SetDeterministic(bool b);
 
@@ -219,9 +226,27 @@ namespace FECoreThreads {
 		std::unique_ptr<std::atomic<int>[]> done(new std::atomic<int>[nb]);
 		for (int p = 0; p < nb; ++p) done[p].store(0, std::memory_order_relaxed);
 		std::atomic<int> next(0);
+		const bool bstatic = StaticAssembly();
 		#pragma omp parallel num_threads(nt)
 		{
 			static thread_local T it;
+			if (bstatic)
+			{
+				const int team = TeamSize(), tid = ThreadNum();
+				const int slice = (n + team - 1) / team;
+				for (int p = 0; p < nb; ++p)
+				{
+					int i0, i1; col.OrderedBlockRange(p, i0, i1);
+					if (i0 / slice != tid) continue;
+					int np = 0;
+					const int* pred = col.Preds(p, np);
+					for (int q = 0; q < np; ++q)
+						while (done[pred[q]].load(std::memory_order_acquire) == 0) SpinPause();
+					for (int i = i0; i < i1; ++i) { compute(i, it); assemble(i, it); }
+					done[p].store(1, std::memory_order_release);
+				}
+			}
+			else
 			for (int p; (p = next.fetch_add(1, std::memory_order_relaxed)) < nb; )
 			{
 				int np = 0;
