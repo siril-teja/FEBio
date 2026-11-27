@@ -166,9 +166,9 @@ void FEElasticSolidDomain::PreSolveUpdate(const FETimeInfo& timeInfo)
 void FEElasticSolidDomain::InternalForces(FEGlobalVector& R)
 {
 	int NE = Elements();
-	// element vectors are computed in parallel and assembled in element order (deterministic)
+	// element vectors are computed in parallel and assembled color by color (deterministic, see FECoreThreads::ComputeAndAssembleColored)
 	struct Item { vector<double> fe; vector<int> lm; bool active = false; };
-	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+	FECoreThreads::ComputeAndAssembleColored<Item>(AssemblyColoring(),
 		[&](int i, Item& it) {
 			// get the element
 			FESolidElement& el = m_Elem[i];
@@ -188,7 +188,7 @@ void FEElasticSolidDomain::InternalForces(FEGlobalVector& R)
 		[&](int i, Item& it) {
 			// assemble element 'fe'-vector into global R vector
 			if (it.active) R.Assemble(m_Elem[i].m_node, it.lm, it.fe);
-		});
+		}, SerialAssembly());
 }
 
 //-----------------------------------------------------------------------------
@@ -420,9 +420,9 @@ void FEElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 	// repeat over all solid elements
 	int NE = Elements();
 
-	// element matrices are computed in parallel and assembled in element order (deterministic)
+	// element matrices are computed in parallel and assembled color by color (deterministic, see FECoreThreads::ComputeAndAssembleColored)
 	struct Item { FEElementMatrix ke; bool active = false; };
-	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+	FECoreThreads::ComputeAndAssembleColored<Item>(AssemblyColoring(),
 		[&](int iel, Item& it) {
 			FESolidElement& el = m_Elem[iel];
 			it.active = el.isActive();
@@ -450,7 +450,7 @@ void FEElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 		[&](int iel, Item& it) {
 			// assemble element matrix in global stiffness matrix
 			if (it.active) LS.Assemble(it.ke);
-		}, 256);
+		}, SerialAssembly());
 }
 
 //-----------------------------------------------------------------------------

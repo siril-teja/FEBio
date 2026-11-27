@@ -121,7 +121,19 @@ void FESolidLinearSystem::Assemble(const FEElementMatrix& ke)
 		}
 
 		// see if there are any rigid body dofs here
-		#pragma omp critical (rigidStiffness)
-		m_rigidSolver->RigidStiffness(m_K, m_u, m_F, ke, m_alpha);
+		// (the lock is only needed for elements that are attached to a rigid body)
+		bool brigid = false;
+		const FEMesh& mesh = m_fem->GetMesh();
+		for (int n : ke.Nodes())
+		{
+			if (n < 0) continue;
+			const FENode& node = mesh.Node(n);
+			if ((node.m_rid >= 0) || (node.HasFlags(FENode::SHELL) && node.HasFlags(FENode::RIGID_CLAMP))) { brigid = true; break; }
+		}
+		if (brigid)
+		{
+			#pragma omp critical (rigidStiffness)
+			m_rigidSolver->RigidStiffness(m_K, m_u, m_F, ke, m_alpha);
+		}
 	}
 }
