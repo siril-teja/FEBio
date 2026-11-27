@@ -62,7 +62,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 3.6 | Faster contact search (spatial index) | ⬜ |
 | 3.7 | Parallel triangular solve | ✅ #22 |
 | 3.8 | Top-of-tree parallel factorization | ✅ #23 |
-| 3.9 | Portable release builds (runtime CPU dispatch) | ⬜ |
+| 3.9 | Portable release builds (runtime CPU dispatch) | ✅ |
 | 3.10 | Pipelined ordered assembly (compute next chunk while one thread assembles) | ✅ |
 | 3.11 | Graph-colored parallel assembly (deterministic, thread-count independent) | ✅ |
 | 3.12 | Faster Rust LU on large non-symmetric systems (≥ PARDISO) | ✅ |

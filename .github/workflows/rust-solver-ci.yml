@@ -21,9 +21,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Portable CPU target, so compiled Rust dependencies can be cached across runners
-  # (the crate's default, target-cpu=native, is for local builds and benchmarks).
-  RUSTFLAGS: -C target-cpu=x86-64-v3
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_MAXSIZE: 500M
 
