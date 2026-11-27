@@ -477,54 +477,137 @@ pub fn factor(
     }
 }
 
-/// x <- U^{-1} L^{-1} x in permuted ordering (sequential, supernodal)
-pub fn solve_permuted(sym: &Symbolic, lsym: &LuSymbolic, num: &LuNumeric, x: &mut [f64]) {
+/// x <- U^{-1} L^{-1} x in permuted ordering, parallel over the elimination tree.
+///
+/// forward  (L y = b): left-looking; supernode s gathers its descendants' contributions
+///          into its own entries only, in fixed-size chunks summed in a fixed order, so
+///          independent subtrees run in parallel and the result does not depend on the
+///          thread count;
+/// backward (U x = y): top of the tree first (parallel over the columns of large
+///          supernodes), then the independent subtrees in parallel; each supernode only
+///          writes its own entries and reads ancestors, which are final.
+/// The same algorithm runs for any thread count: the solution is bitwise identical.
+pub fn solve_permuted_par(
+    sym: &Symbolic,
+    lsym: &LuSymbolic,
+    num: &LuNumeric,
+    x: &mut [f64],
+    subtrees: &[usize],
+    top: &[usize],
+) {
+    use rayon::prelude::*;
+    let xp = SyncPtr(x.as_mut_ptr());
     let lp = SyncPtr(num.l.as_ptr() as *mut f64);
     let up = SyncPtr(num.ut.as_ptr() as *mut f64);
-    for s in 0..sym.ns {
+
+    let fwd = |s: usize, par: bool| {
+        let xq = xp;
         let b = sym.sn_begin[s];
         let k = sym.k(s);
-        let m = sym.m(s);
-        let pat = sym.pattern(s);
-        let lpan = unsafe { mat_ref(lp, sym.val_ptr[s], m, k) };
-        {
-            let xs = MatMut::from_column_major_slice_mut(&mut x[b..b + k], k, 1);
-            solve_unit_lower_triangular_in_place(lpan.subrows(0, k), xs, Par::Seq);
-        }
-        if m > k {
-            let l21 = lpan.subrows(k, m - k);
-            for c in 0..k {
-                let xc = x[b + c];
-                if xc == 0.0 {
+        let upds = sym.updates(s);
+        let gather = |u: &crate::symbolic::Update, acc: &mut [f64]| {
+            let d = u.d as usize;
+            let kd = sym.k(d);
+            let md = sym.m(d);
+            let bd = sym.sn_begin[d];
+            let pd = sym.pattern(d);
+            let (r0, r1) = (u.r0 as usize, u.r1 as usize);
+            let ld = unsafe { mat_ref(lp, sym.val_ptr[d], md, kd) };
+            for j in 0..kd {
+                let yj = unsafe { *xq.get().add(bd + j) };
+                if yj == 0.0 {
                     continue;
                 }
-                let col = l21.col(c);
-                for (r, &row) in pat.iter().enumerate() {
-                    x[row] -= col[r] * xc;
+                let col = ld.col(j);
+                for t in r0..r1 {
+                    acc[pd[t] - b] -= col[kd + t] * yj;
                 }
             }
+        };
+        const CHUNK: usize = 32;
+        let nchunks = upds.len().div_ceil(CHUNK);
+        let chunk_sum = |ci: usize| -> Vec<f64> {
+            let mut acc = vec![0.0f64; k];
+            for u in &upds[ci * CHUNK..((ci + 1) * CHUNK).min(upds.len())] {
+                gather(u, &mut acc);
+            }
+            acc
+        };
+        let partial: Vec<Vec<f64>> = if par && nchunks > 1 {
+            (0..nchunks).into_par_iter().map(chunk_sum).collect()
+        } else {
+            (0..nchunks).map(chunk_sum).collect()
+        };
+        // SAFETY: x[b..b+k] is owned by supernode s during this call
+        let xs = unsafe { std::slice::from_raw_parts_mut(xq.get().add(b), k) };
+        let mut acc = vec![0.0f64; k];
+        for pc in &partial {
+            for (a, v) in acc.iter_mut().zip(pc) {
+                *a += v;
+            }
         }
-    }
-    for s in (0..sym.ns).rev() {
+        for c in 0..k {
+            xs[c] += acc[c];
+        }
+        let ls = unsafe { mat_ref(lp, sym.val_ptr[s], sym.m(s), k) };
+        let xm = MatMut::from_column_major_slice_mut(xs, k, 1);
+        solve_unit_lower_triangular_in_place(ls.subrows(0, k), xm, Par::Seq);
+    };
+
+    let bwd = |s: usize, par: bool| {
+        let xq = xp;
         let b = sym.sn_begin[s];
         let k = sym.k(s);
         let m = sym.m(s);
         let pat = sym.pattern(s);
-        let lpan = unsafe { mat_ref(lp, sym.val_ptr[s], m, k) };
+        let ls = unsafe { mat_ref(lp, sym.val_ptr[s], m, k) };
+        let mut v = vec![0.0f64; k];
         if m > k {
             let ut = unsafe { mat_ref(up, lsym.ut_ptr[s], m - k, k) };
-            for c in 0..k {
+            let dot = |c: usize| -> f64 {
                 let col = ut.col(c);
                 let mut acc = 0.0;
                 for (r, &row) in pat.iter().enumerate() {
-                    acc += col[r] * x[row];
+                    // rows of the pattern belong to ancestors (final values)
+                    acc += col[r] * unsafe { *xq.get().add(row) };
                 }
-                x[b + c] -= acc;
+                acc
+            };
+            if par && (m - k) * k >= 200_000 {
+                v.par_iter_mut()
+                    .enumerate()
+                    .for_each(|(c, out)| *out = dot(c));
+            } else {
+                for c in 0..k {
+                    v[c] = dot(c);
+                }
             }
         }
-        let xs = MatMut::from_column_major_slice_mut(&mut x[b..b + k], k, 1);
-        solve_upper_triangular_in_place(lpan.subrows(0, k), xs, Par::Seq);
+        // SAFETY: x[b..b+k] is owned by supernode s during this call
+        let xs = unsafe { std::slice::from_raw_parts_mut(xq.get().add(b), k) };
+        for c in 0..k {
+            xs[c] -= v[c];
+        }
+        let xm = MatMut::from_column_major_slice_mut(xs, k, 1);
+        solve_upper_triangular_in_place(ls.subrows(0, k), xm, Par::Seq);
+    };
+
+    subtrees.par_iter().with_max_len(1).for_each(|&r| {
+        for s in sym.first_desc[r]..=r {
+            fwd(s, false);
+        }
+    });
+    for &s in top {
+        fwd(s, true);
     }
+    for &s in top.iter().rev() {
+        bwd(s, true);
+    }
+    subtrees.par_iter().with_max_len(1).for_each(|&r| {
+        for s in (sym.first_desc[r]..=r).rev() {
+            bwd(s, false);
+        }
+    });
 }
 
 /// y = A x for CSR

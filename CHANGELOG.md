@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.2] - 2026-11-27
+
+### Performance
+- **Rust LU triangular solves are now parallel and deterministic** (ROADMAP 3.12, part 1). They use the same elimination-tree method as the LDLᵀ path: chunked left-looking forward gather, then a top-down backward pass. Results are bitwise identical for any thread count.
+  - On the Finley 59F L1–L5 matrix (170,478 equations), a solve takes 0.16–0.19 s instead of 0.40 s at 4 threads.
+  - On the first 20 steps of that model: linear solver −22%, total −16%. Iterations, range of motion, IDP and facet forces are identical.
+- **`FRS_DUMP`** now also dumps unsymmetric matrices, and the new `runlu` example times them.
+
 ## [1.1.1] - 2026-11-27
 
 ### CI
