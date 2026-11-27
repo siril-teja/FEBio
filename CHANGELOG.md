@@ -12,6 +12,18 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.3] - 2026-11-27
+
+### Performance
+- **Rust LU factorization runs the elimination tree as a task graph** (ROADMAP 3.12, part 2). Every top-of-tree supernode starts as soon as its children are done, instead of the whole top running in sequence after all subtrees.
+  - The factorization is unchanged, so results are bitwise identical.
+  - On the Finley 59F L1–L5 matrix: 3.4–3.8 s instead of 4.0–4.3 s per factorization at 4 threads.
+- **Tuning checked and rejected:**
+  - A finer subtree split was slower.
+  - AMD ordering roughly triples the factorization work.
+  - Other METIS options increase fill.
+  - The LU kernels run close to the dense-kernel peak on one core.
+
 ## [1.1.2] - 2026-11-27
 
 ### Performance

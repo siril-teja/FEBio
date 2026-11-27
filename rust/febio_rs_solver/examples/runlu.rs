@@ -30,6 +30,12 @@ fn main() {
         .collect();
     println!("n={n} nnz={nnz}");
     let mut s = Solver::new(nt);
+    if let Ok(o) = std::env::var("RUNLU_ORDERING") {
+        s.ordering = match o.as_str() {
+            "amd" => febio_rs_solver::Ordering::Amd,
+            _ => febio_rs_solver::Ordering::Metis,
+        };
+    }
     let t = Instant::now();
     s.analyze_unsymmetric(n, &rp, &ci, 0).unwrap();
     println!(
