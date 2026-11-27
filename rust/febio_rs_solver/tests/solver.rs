@@ -1,5 +1,8 @@
 //! Correctness tests on FE-like 3D stencil matrices (3 dofs per node, 27-point coupling).
-use febio_rs_solver::{lu::csr_spmv, sym_spmv_lower, Solver};
+use febio_rs_solver::{
+    lu::{csr_spmv, csr_spmv_par},
+    sym_spmv_lower, Solver,
+};
 
 struct Rng(u64);
 impl Rng {
@@ -253,5 +256,27 @@ fn deterministic_unsymmetric_repeated_runs() {
                 "unsymmetric solve not reproducible at {t} threads"
             );
         }
+    }
+}
+
+#[test]
+fn parallel_spmv_is_bitwise_serial() {
+    let (n, rp, ci, v) = stencil(11, 0.3, 30.0, 5);
+    let rpu: Vec<usize> = rp.iter().map(|&x| x as usize).collect();
+    let ciu: Vec<usize> = ci.iter().map(|&x| x as usize).collect();
+    let x = xtrue(n);
+    let mut ys = vec![0.0; n];
+    csr_spmv(n, &rpu, &ciu, &v, &x, &mut ys);
+    for t in [1, 3, 4] {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(t)
+            .build()
+            .unwrap();
+        let mut yp = vec![0.0; n];
+        pool.install(|| csr_spmv_par(n, &rpu, &ciu, &v, &x, &mut yp));
+        assert!(
+            ys.iter().zip(&yp).all(|(a, b)| a.to_bits() == b.to_bits()),
+            "threads={t}"
+        );
     }
 }

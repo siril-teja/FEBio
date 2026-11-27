@@ -505,7 +505,7 @@ impl Solver {
         let mut r = vec![0.0; n];
         let mut dx = vec![0.0; n];
         let resid = |x: &[f64], r: &mut [f64]| -> f64 {
-            lu::csr_spmv(n, rowptr, colidx, vals, x, r);
+            pool.install(|| lu::csr_spmv_par(n, rowptr, colidx, vals, x, r));
             let mut s = 0.0;
             for i in 0..n {
                 r[i] = b[i] - r[i];

@@ -709,6 +709,24 @@ pub fn solve_permuted_par(
 }
 
 /// y = A x for CSR
+/// y = A x for a CSR matrix, rows in parallel. Every row is summed in the same order as
+/// in [`csr_spmv`], so the result is bitwise identical to it for any thread count.
+pub fn csr_spmv_par(n: usize, rp: &[usize], ci: &[usize], v: &[f64], x: &[f64], y: &mut [f64]) {
+    use rayon::prelude::*;
+    const ROWS: usize = 2048;
+    y[..n].par_chunks_mut(ROWS).enumerate().for_each(|(c, yc)| {
+        let r0 = c * ROWS;
+        for (k, yr) in yc.iter_mut().enumerate() {
+            let r = r0 + k;
+            let mut acc = 0.0;
+            for t in rp[r]..rp[r + 1] {
+                acc += v[t] * x[ci[t]];
+            }
+            *yr = acc;
+        }
+    });
+}
+
 pub fn csr_spmv(n: usize, rp: &[usize], ci: &[usize], v: &[f64], x: &[f64], y: &mut [f64]) {
     for r in 0..n {
         let mut acc = 0.0;
