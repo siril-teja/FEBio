@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.10] - 2026-11-27
+
+### CI
+- **Spine smoke test on a published model** (ROADMAP 2.3). `rust/bench/finley/ci_smoke.py` runs the first 12 time steps of the Finley et al. (2018) 59F L4–L5 functional spinal unit (49,971 equations, from `models/finley2018`) with PARDISO and with the Rust solver.
+  - It checks that both terminate normally, with equal iterations and reformations.
+  - Range of motion must agree within 1e-9, and IDP and facet forces within 1e-6.
+  - `--repeat` adds a reproducibility check.
+  - In CI it runs on 2 threads alongside the regression suite (about 1 min) and writes its table to the job summary.
 ## [1.1.9] - 2026-11-27
 
 ### Documentation

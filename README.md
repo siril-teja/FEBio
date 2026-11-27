@@ -83,6 +83,7 @@ How the deterministic mode works:
   - the Rust crate checks;
   - the FEBio build;
   - the PARDISO-vs-Rust regression: iterations equal, displacements within 1e-9, and spine quantities of interest within tolerance (range of motion, intradiscal pressure, facet contact force);
+  - the spine smoke test: the first 12 steps of the published Finley 59F L4–L5 model, PARDISO vs Rust;
   - the determinism gate;
   - the PR policy.
 
