@@ -12,6 +12,18 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.1.4] - 2026-11-27
+
+### Performance
+- **Graph-colored parallel element assembly** (ROADMAP 3.11) for solid, three-field and biphasic domains. It replaces the ordered pipeline (3.10), whose single assembling thread bounded the element loops.
+  - Elements are grouped into blocks of up to 16 consecutive elements (fewer for small domains). Blocks are colored first-fit in index order so that blocks of one color share no node or rigid body.
+  - Blocks run in parallel. A block waits only for the earlier-colored blocks it shares a node with, so there is no barrier between colors.
+  - Every global entry receives its contributions in color order, so output is bitwise identical from run to run and for any thread count. It differs from earlier versions in the last bits, because the summation order changed.
+  - Elements without rigid nodes no longer take the rigid-coupling lock.
+  - Finley 59F L1–L5, first 20 steps, 4 threads: stiffness 16.5–17.1 s → 8.4 s (native FEBio: 7.9–8.7 s), residual 16.9–17.4 s → 11.0 s, total 182–194 s → 166–172 s. Native: 178–196 s. Iterations and rotation identical.
+- **Rust solver `omp_blocktime` default 0 → 5 ms.** OpenMP threads now stay awake between the back-to-back per-domain loops of one assembly and still sleep before the Rust factorization.
+- ROADMAP 3.12 is marked done: on the full 59F L1–L5 run, Rust linear-solver time is now below PARDISO's (644 s vs 700 s).
+
 ## [1.1.3] - 2026-11-27
 
 ### Performance

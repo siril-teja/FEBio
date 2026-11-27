@@ -180,7 +180,18 @@ The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU r
 Raw data is in `rust/bench/results/finley_l15.json`. The final rigid-body quaternions agree to every printed digit.
 
 - **49F hex (symmetric matrix):** the Rust LDLᵀ is 22% faster than PARDISO. Stiffness, residual and model update are 1.5–2× slower than native, which keeps the end-to-end gain at 7%.
-- **59F hybrid:** the model sets `symmetric_stiffness 0`, so it solves a non-symmetric system with LU. PARDISO's LU is faster here: 101 factorizations of a matrix with 2.1·10⁸ nonzeros in L. Iterative refinement is not the cause: 4 refinement steps in 80 solves over the first 12 steps. Faster large LU is ROADMAP 3.12.
+- **59F hybrid:** the model sets `symmetric_stiffness 0`, so it solves a non-symmetric system with LU. In this table (1.0.0) PARDISO's LU is faster: 101 factorizations of a matrix with 2.1·10⁸ nonzeros in L. Iterative refinement is not the cause: 4 refinement steps in 80 solves over the first 12 steps. ROADMAP 3.12 (1.1.2–1.1.3) has since made the Rust LU faster than PARDISO; see below.
+- **59F hybrid after the LU work (1.1.3) and colored assembly (1.1.4):** timings vary by up to ±15% between runs on this VM, so builds were compared back to back.
+  - **Full run, native then 1.1.3:** native 969 s (lin. 700), Rust 1046 s (lin. 644). The Rust LU now beats PARDISO, but stiffness, residual and model update cost 285 s against native's 166 s. The model also ran slower on this VM than for the table above (native 969 s vs 703 s).
+  - **First 20 steps, alternated twice (s):**
+
+    | build | total | linear solver | stiffness | residual | model update |
+    |---|---:|---:|---:|---:|---:|
+    | native (PARDISO) | 196 / 178 | 146 / 131 | 8.7 / 7.9 | 8.5 / 7.7 | 10.5 / 10.3 |
+    | 1.1.3 (ordered assembly) | 194 / 182 | 122 / 113 | 17.1 / 16.5 | 17.4 / 16.9 | 13.7 / 13.0 |
+    | **1.1.4 (colored assembly)** | **172 / 166** | 117 / 113 | **8.4 / 8.4** | **11.0 / 11.0** | 11.8 / 11.4 |
+
+    128 iterations and identical rotation in every run. Colored assembly halves stiffness evaluation (now equal to native) and cuts the residual by 36%; end to end, 1.1.4 is 6–12% faster than native.
 - **59F solver setting (assumption):** the model sets `qnmethod 2`. FEBio 4 reads that as JFNK, which needs an iterative solver; FEBio 2.5/2.6, which produced the authors' log, had only BFGS (0) and Broyden (1). The converter maps it to BFGS:
 
   | setting | iterations | reformations |
