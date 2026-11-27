@@ -8,7 +8,7 @@ Build an open-source nonlinear FE solver for spine biomechanics that is as fast 
 
 | | Target | Measured on |
 |---|---|---|
-| Speed | ≥ 5× faster end to end than upstream FEBio 4.13 + PARDISO | Finley et al. 2018 L4–L5 and L1–L5 models, 32+ cores |
+| Speed | ≥ 5× faster end to end than upstream FEBio 4.13 + PARDISO | Finley et al. 2018 L4–L5 and L1–L5 models, up to 32 cores + one NVIDIA L40 GPU |
 | Accuracy | Same iteration counts; displacements and range of motion within 1e-9, intradiscal pressure and facet contact forces within 1e-6 (relative) of upstream FEBio | same models |
 | Determinism | Byte-identical output for every run and every thread count | CI gate |
 | Build | One `cargo build`, no vendor libraries | Linux, macOS, Windows |
@@ -55,17 +55,20 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | # | Item | Status |
 |---|---|---|
 | 3.1 | Cheaper restart snapshot per time step | ⬜ |
-| 3.2 | Reuse the stiffness sparsity pattern across time steps | ⬜ |
+| 3.2 | Reuse the stiffness sparsity pattern across time steps | ✅ #28 |
 | 3.3 | Type-tag material point lookup (no `dynamic_cast`) | ⬜ |
 | 3.4 | Deterministic parallel contact | ✅ |
 | 3.5 | Deterministic parallel springs, rigid bodies and surface loads | ✅ |
 | 3.6 | Faster contact search (spatial index) | ⬜ |
-| 3.7 | Parallel triangular solve | ⬜ |
-| 3.8 | Top-of-tree parallel factorization | ⬜ |
+| 3.7 | Parallel triangular solve | ✅ #22 |
+| 3.8 | Top-of-tree parallel factorization | ✅ #23 |
 | 3.9 | Portable release builds (runtime CPU dispatch) | ⬜ |
 | 3.10 | Pipelined ordered assembly (compute next chunk while one thread assembles) | ✅ |
 | 3.11 | Graph-colored parallel assembly (deterministic, thread-count independent) | ✅ |
 | 3.12 | Faster Rust LU on large non-symmetric systems (≥ PARDISO) | ✅ |
+| 3.13 | GPU mixed-precision LU: FP32 factorization and solves on the GPU (NVIDIA L40, 48 GB), FP64 refinement on the CPU, automatic FP64 fallback; opt-in, QoIs within tolerance | ⬜ |
+| 3.14 | GPU FP64 direct solver (NVIDIA cuDSS) as an optional linear solver; compare with 3.13 and the 32-core CPU solver | ⬜ |
+| 3.15 | Overlap CPU assembly with GPU factorization and solves | ⬜ |
 
 ## Phase 4 — Rust FE core
 
@@ -91,4 +94,4 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 5.2 | NUMA-aware memory and thread placement | ⬜ |
 | 5.3 | Parallel load cases and parameter sweeps from Python | ⬜ |
 | 5.4 | Rust core becomes the default; C++ kept as reference only | ⬜ |
-| 5.5 | Target check: ≥ 5× on 32+ cores, accuracy and determinism held | ⬜ |
+| 5.5 | Target check: ≥ 5× on up to 32 cores + L40, accuracy and determinism held | ⬜ |
