@@ -12,6 +12,14 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.3.0] - 2026-11-27
+
+### Added
+- **Scaling-study driver** `rust/bench/finley/scaling.py` (ROADMAP 2.4). For each model and thread count (default 4, 8, 16, 32) it runs native FEBio (PARDISO) and FEBio-Rust. It records total, linear-solver and phase times, iterations and QoI differences, and writes JSON plus a Markdown table. `--steps N` runs only the first N steps.
+
+### Documentation
+- OPEN_ITEMS P7 (restart snapshot) re-measured: 0.15 s per step, 1.7% of the full Finley 59F L1–L5 run.
+
 ## [1.2.1] - 2026-11-27
 
 ### Documentation
