@@ -136,6 +136,61 @@ The smallest symmetric speed-up is `fsu_n40_ar` at 4 threads (1.08×). Axial rot
 
 ---
 
+# Published spine models: Finley et al. (2018)
+
+These are the subject-specific FEBio lumbar models of Finley et al. (2018, CMBBE 21(6):444–452), stored in `models/finley2018/`.
+- **Load case:** each model carries a pressure preload and then a 7.5 N·m pure moment over 100 load steps.
+- **Format conversion:** the FEBio 2.5 files are converted for FEBio 4 by `rust/bench/finley/convert_feb25.py`. The converter changes no values, apart from the documented solver-setting mapping for 59F L1–L5 below, and produces identical input for every configuration; see `models/finley2018/README.md`.
+- **Driver:** `rust/bench/finley/run_finley.py`; raw data in `rust/bench/results/finley_l45.json` (L4–L5) and `finley_l15.json` (L1–L5).
+- **Machine:** 4 threads, the same 4-core VM as above. Run-to-run noise on this VM is about ±10%.
+
+| config | executable | linear solver | mode |
+|---|---|---|---|
+| native | upstream FEBio 4.13 (`552138d`) | MKL PARDISO | upstream (non-deterministic) |
+| Rust | FEBio-Rust (0.4.9 + #17, i.e. 0.4.10) | Rust | deterministic (default) |
+| Rust + PARDISO | FEBio-Rust | MKL PARDISO (reproducible mode) | deterministic (default) |
+
+## L4–L5 functional spinal units
+
+| model | equations | native | Rust | Rust + PARDISO | Rust vs native | iterations / reformations | rotation of the loaded vertebra (°) |
+|---|---:|---:|---:|---:|---:|---|---|
+| 59F L4–L5 hybrid | 49,971 | 126.3 s (lin. 87.6) | **120.3 s** (lin. 64.1) | 152.7 s | **1.05×** | 378 / 100, all three | 4.0433, all three |
+| 49F L4–L5 hex | 110,508 | 288.0 s (lin. 223.3) | **214.0 s** (lin. 134.6) | 342.4 s | **1.35×** | 368 / 100, all three | 4.0414, all three |
+| 49F L4–L5 hybrid | 112,764 | 67.8 s (lin. 50.2) | 73.9 s (lin. 46.3) | 83.1 s | 0.92× | 97 / 15, all three | 5.0045, all three |
+
+The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU refinement (#17); before 0.4.10 it took 101.4 s.
+
+- **Accuracy:**
+  - All three configurations take the same number of equilibrium iterations and reformations.
+  - The final rigid-body rotations agree to the 12 digits FEBio prints.
+  - The authors' FEBio 2.x logs report 378 iterations for 59F and 365 for 49F hex.
+- **Linear solver:** the Rust solver is 8–40% faster than native PARDISO. FEBio-Rust's own PARDISO runs are slower than native, because MKL's reproducible (CNR) mode costs about 30%.
+- **Remaining gap:**
+  - **Stiffness and residual evaluation:** about 2× slower than native. FEBio-Rust adds element contributions in a fixed order, and native uses atomics (OPEN_ITEMS P13, ROADMAP 3.11).
+  - **Serial loops:** contact and spring loops still run serially in deterministic mode (ROADMAP 3.4/3.5).
+  - These costs dominate on BFGS-heavy runs with few reformations (49F hybrid).
+
+## L1–L5 lumbar spines
+
+| model | equations | native | Rust | Rust vs native | iterations / reformations | rotation of the loaded vertebra (°) |
+|---|---:|---:|---:|---:|---|---|
+| 49F L1–L5 hex | 280,467 | 1042 s (lin. 802) | **971 s** (lin. 623) | **1.07×** | 958 / 101, identical | 18.2622, identical |
+| 59F L1–L5 hybrid | 170,478 | **703 s** (lin. 520) | 947 s (lin. 668) | 0.74× | 867 / 101, identical | 19.5712, identical |
+
+Raw data is in `rust/bench/results/finley_l15.json`. The final rigid-body quaternions agree to every printed digit.
+
+- **49F hex (symmetric matrix):** the Rust LDLᵀ is 22% faster than PARDISO. Stiffness, residual and model update are 1.5–2× slower than native, which keeps the end-to-end gain at 7%.
+- **59F hybrid:** the model sets `symmetric_stiffness 0`, so it solves a non-symmetric system with LU. PARDISO's LU is faster here: 101 factorizations of a matrix with 2.1·10⁸ nonzeros in L. Iterative refinement is not the cause: 4 refinement steps in 80 solves over the first 12 steps. Faster large LU is ROADMAP 3.12.
+- **59F solver setting (assumption):** the model sets `qnmethod 2`. FEBio 4 reads that as JFNK, which needs an iterative solver; FEBio 2.5/2.6, which produced the authors' log, had only BFGS (0) and Broyden (1). The converter maps it to BFGS:
+
+  | setting | iterations | reformations |
+  |---|---:|---:|
+  | authors' log (679 iterations) | 679 | 100 |
+  | BFGS | 867 | 101 |
+  | Broyden | 1121 | 112 |
+
+  BFGS matches the authors' reformation count and was FEBio 2.x's default. Both settings converge to essentially the same rotation: 19.571° (BFGS) vs 19.568° (Broyden).
+
 # Determinism
 
 **Sources of run-to-run variation found** (verified by repeated runs and byte comparison of the output):

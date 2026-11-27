@@ -325,16 +325,21 @@ void FERigidSolver::RigidStiffness(SparseMatrix& K, vector<double>& ui, vector<d
     FEMesh& mesh = m_fem->GetMesh();
     
     bool bclamped_shell = false;
+	bool brigid = false;
     for (int j = 0; j<n; ++j) 
 	{
 		if (en[j] >= 0)
 		{
-			if (mesh.Node(en[j]).HasFlags(FENode::SHELL) && mesh.Node(en[j]).HasFlags(FENode::RIGID_CLAMP)) {
+			const FENode& node = mesh.Node(en[j]);
+			if (node.m_rid >= 0) brigid = true;
+			if (node.HasFlags(FENode::SHELL) && node.HasFlags(FENode::RIGID_CLAMP)) {
 				bclamped_shell = true;
 				break;
 			}
 		}
     }
+	// the solid coupling only acts on rigid nodes: nothing to do without one
+	if (!bclamped_shell && !brigid) return;
     if (bclamped_shell)
         RigidStiffnessShell(K, ui, F, en, ke.RowIndices(), ke.ColumnsIndices(), ke, alpha);
     else

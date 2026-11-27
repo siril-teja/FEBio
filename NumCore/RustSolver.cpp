@@ -110,7 +110,7 @@ bool RustSolver::PreProcess()
 		FrsSolver* s = frs_create(nthreads);
 		m_solver = s;
 		frs_set_option(s, FRS_OPT_ORDERING, m_ordering);
-		if (m_pivotEps > 0) frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);	// 0 = solver default (as PARDISO: 1e-8 LDLT, 1e-13 LU)
+		if (m_pivotEps > 0) frs_set_option(s, FRS_OPT_PIVOT_EPS, m_pivotEps);	// 0 = solver default (1e-13 of max|Aij| for LDLT and LU)
 		frs_set_option(s, FRS_OPT_REFINE, m_refine);
 		frs_set_option(s, FRS_OPT_REUSE_ORDERING, m_reuseOrdering ? 1.0 : 0.0);
 	}
