@@ -1,10 +1,14 @@
 name: Rust solver CI
 
-# The gate for every pull request into main (Linux only). It runs once per PR head
-# (no extra push runs; main is only ever updated by these PRs) and is skipped for
-# documentation-only changes. A newer commit cancels the running check.
+# The gate for every pull request into main (Linux only). It runs once per PR head and
+# is skipped for documentation-only changes; a newer commit cancels the running check.
+# A push to main (i.e. a merged PR) only rebuilds, without tests, to refresh the build
+# caches: GitHub shares caches across pull requests only when they come from main.
 on:
   pull_request:
+    branches: ['main']
+    paths-ignore: ['**.md', 'LICENSE', '.github/workflows/pr-policy.yml', 'ci/pr_policy.py']
+  push:
     branches: ['main']
     paths-ignore: ['**.md', 'LICENSE', '.github/workflows/pr-policy.yml', 'ci/pr_policy.py']
   workflow_dispatch:
@@ -40,14 +44,20 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/febio_rs_solver/target
-          key: cargo-v3-crate-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: cargo-v3-crate-${{ hashFiles('rust/febio_rs_solver/Cargo.lock') }}-
+          key: cargo-v3-crate-${{ github.sha }}
+          restore-keys: cargo-v3-crate-
       - name: Format
+        if: github.event_name != 'push'
         run: cargo fmt --check
       - name: Clippy (correctness and suspicious lints are errors)
+        if: github.event_name != 'push'
         run: cargo clippy --release --all-targets -- -D clippy::correctness -D clippy::suspicious
       - name: Unit and integration tests
+        if: github.event_name != 'push'
         run: cargo test --release
+      - name: Build tests (cache warm-up on main)
+        if: github.event_name == 'push'
+        run: cargo test --release --no-run
 
   febio:
     name: FEBio build + PARDISO-vs-Rust regression
@@ -68,8 +78,8 @@ jobs:
             cmbuild/rust_target
             .ccache
             ~/.cache/pip
-          key: febio-build-${{ hashFiles('rust/febio_rs_solver/Cargo.lock', 'CMakeLists.txt') }}-${{ github.sha }}
-          restore-keys: febio-build-${{ hashFiles('rust/febio_rs_solver/Cargo.lock', 'CMakeLists.txt') }}-
+          key: febio-build-${{ github.sha }}
+          restore-keys: febio-build-
       - name: MKL (PARDISO reference)
         run: |
           ARGS=$(ci/rust/setup-mkl.sh "$RUNNER_TEMP/mkl" 2> mkl.log)
@@ -82,14 +92,15 @@ jobs:
       - name: Build
         run: cmake --build cmbuild -j $(nproc) && ccache -s
       - name: Regression (PARDISO vs Rust)
+        if: github.event_name != 'push'
         run: |
           python3 rust/bench/ci_regression.py --febio cmbuild/bin/febio4 --workdir "$RUNNER_TEMP/runs" \
             --threads 2 --tol 1e-9 --json ci_regression.json --md ci_regression.md
       - name: Summary
-        if: always()
+        if: always() && github.event_name != 'push'
         run: test -f ci_regression.md && cat ci_regression.md >> "$GITHUB_STEP_SUMMARY" || true
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name != 'push'
         with:
           name: rust-solver-regression
           path: |
