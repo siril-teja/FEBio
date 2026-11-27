@@ -245,6 +245,22 @@ void FEMechModel::BuildMatrixProfile(FEGlobalMatrix& G, bool breset)
 }
 
 //-----------------------------------------------------------------------------
+// The static profile also holds the rigid-body equations.
+unsigned long long FEMechModel::StaticProfileKey()
+{
+	unsigned long long h = FEModel::StaticProfileKey();
+	if (h == 0) return 0;
+	const int NRB = RigidBodies();
+	h ^= (unsigned long long)NRB; h *= 1099511628211ull;
+	for (int i = 0; i < NRB; ++i)
+	{
+		const FERigidBody& rb = *GetRigidBody(i);
+		for (int j = 0; j < 6; ++j) { h ^= (unsigned long long)(long long)rb.m_LM[j]; h *= 1099511628211ull; }
+	}
+	return (h == 0 ? 1 : h);
+}
+
+//-----------------------------------------------------------------------------
 // update rigid part of mesh
 void FEMechModel::UpdateRigidMesh()
 {

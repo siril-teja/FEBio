@@ -2715,3 +2715,44 @@ FEScript FEModel::GetScript(const std::string& name) const
 		return FEScript();
 	}
 }
+
+//-----------------------------------------------------------------------------
+unsigned long long FEModel::StaticProfileKey()
+{
+	// linear constraints add cross terms that depend on the step's domains: no reuse
+	if (GetLinearConstraintManager().LinearConstraints() > 0) return 0;
+
+	// FNV-1a over the integers the static profile depends on
+	unsigned long long h = 1469598103934665603ull;
+	auto mix = [&h](long long v) { h ^= (unsigned long long)v; h *= 1099511628211ull; };
+
+	FEMesh& mesh = GetMesh();
+	const int NN = mesh.Nodes();
+	mix(NN);
+	for (int i = 0; i < NN; ++i)
+	{
+		const FENode& node = mesh.Node(i);
+		mix((long long)node.m_ID.size());
+		for (int id : node.m_ID) mix(id);
+		mix(node.m_rid);
+		mix(node.m_nstate);
+	}
+
+	const int ND = mesh.Domains();
+	mix(ND);
+	for (int nd = 0; nd < ND; ++nd)
+	{
+		FEDomain& dom = mesh.Domain(nd);
+		mix(dom.IsActive() ? 1 : 0);
+		const int NE = dom.Elements();
+		mix(NE);
+		for (int i = 0; i < NE; ++i)
+		{
+			const FEElement& el = dom.ElementRef(i);
+			mix(el.isActive() ? 1 : 0);
+			mix((long long)el.m_node.size());
+			for (int n : el.m_node) mix(n);
+		}
+	}
+	return (h == 0 ? 1 : h);
+}

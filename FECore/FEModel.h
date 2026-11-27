@@ -155,6 +155,12 @@ public:
 	//! Build the matrix profile for this model
 	virtual void BuildMatrixProfile(FEGlobalMatrix& G, bool breset);
 
+	//! Key of everything the "static" matrix profile depends on: element connectivity and
+	//! activity, nodal equation numbers, rigid-body attachment and node flags (and, in
+	//! derived models, rigid-body equations). FEGlobalMatrix keeps its static profile while
+	//! the key is unchanged. 0 means "always rebuild" (e.g. with linear constraints).
+	virtual unsigned long long StaticProfileKey();
+
 	// call this function to set the mesh's update flag
 	void SetMeshUpdateFlag(bool b);
 
