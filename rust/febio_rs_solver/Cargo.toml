@@ -1,6 +1,6 @@
 [package]
 name = "febio_rs_solver"
-version = "1.1.10"
+version = "1.2.0"
 edition = "2021"
 description = "Parallel supernodal sparse direct solver (LDL^T / LU) for FEBio, exposed through a C ABI"
 license = "MIT"
