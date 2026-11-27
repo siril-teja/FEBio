@@ -191,6 +191,28 @@ Raw data is in `rust/bench/results/finley_l15.json`. The final rigid-body quater
 
   BFGS matches the authors' reformation count and was FEBio 2.x's default. Both settings converge to essentially the same rotation: 19.571° (BFGS) vs 19.568° (Broyden).
 
+## Spine quantities of interest
+
+The benchmark driver and the CI gate both compare three quantities between configurations, computed by `rust/bench/qoi.py` from the log and plot files:
+
+| quantity | definition | tolerance |
+|---|---|---|
+| range of motion | rotation of each rigid body (vertebra) at the end of the run | 1e-9 relative |
+| intradiscal pressure (IDP) | mean −(σxx+σyy+σzz)/3 over each nucleus's elements; positive = compressive | 1e-6 relative to the group maximum (float32 plot data) |
+| facet contact force | magnitude of FEBio's total contact force on each contact surface | 1e-6 relative to the group maximum |
+
+Native FEBio 4.13 against FEBio-Rust (Rust solver), 4 threads. The values are native's; FEBio-Rust's are **identical in every case**:
+
+| model | range of motion | IDP per disc (MPa) | facet contact force (N) |
+|---|---:|---|---|
+| 59F L4–L5 hybrid | 4.0433° | L4–L5 −0.754 | no facet in contact |
+| 49F L4–L5 hex | 4.0414° | L4–L5 −0.688 | L4–L5 right 0.447 |
+| 49F L4–L5 hybrid | 5.0045° | L4–L5 0.108 | no facet in contact |
+| 49F L1–L5 hex | 18.2622° | L1–L2 0.196, L2–L3 0.214, L3–L4 0.166, L4–L5 0.106 | L1–L2 R 1.627, L2–L3 R 0.282, L3–L4 R 0.895 |
+| 59F L1–L5 hybrid | 19.5712° | L1–L2 −0.685, L2–L3 −0.654, L3–L4 −0.717, L4–L5 −0.682 | L1–L2 L 0.057, L2–L3 L 0.227, L3–L4 L 0.038 |
+
+The negative IDP values mean the nucleus ends up in mean tension under this load. The 49F L4–L5 hybrid FEBio-Rust run is the pre-0.4.10 one; refinement changes since then do not change its rotation (identical to 12 digits).
+
 # Determinism
 
 **Sources of run-to-run variation found** (verified by repeated runs and byte comparison of the output):

@@ -304,7 +304,7 @@ def main():
 
     w('<LoadData><load_controller id="1" type="loadcurve"><interpolate>LINEAR</interpolate>'
       '<points><pt>0,0</pt><pt>1,1</pt></points></load_controller></LoadData>')
-    w('<Output><plotfile type="febio"><var type="displacement"/><var type="stress"/></plotfile><logfile>'
+    w('<Output><plotfile type="febio"><var type="displacement"/><var type="stress"/><var type="contact force"/></plotfile><logfile>'
       f'<rigid_body_data data="x;y;z;qx;qy;qz;qw" file="{stem}_rb.txt">2</rigid_body_data>'
       f'<node_data data="ux;uy;uz" delim="," file="{stem}_disp.txt"/>'
       '</logfile></Output>')
