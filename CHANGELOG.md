@@ -12,7 +12,7 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
-## [1.0.1] - 2026-11-27
+## [1.1.1] - 2026-11-27
 
 ### CI
 - **Linux only:** removed the upstream FEBio Linux, macOS and Windows workflows and the release-tag workflow. They needed `febiosoftware` infrastructure and never ran in this fork. Also removed their scripts: `ci/Linux`, `ci/macOS`, `ci/Windows`, the plugin scripts and `ci/febio.xml`.
@@ -22,6 +22,20 @@ The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0)
   - runs the crate and FEBio jobs in parallel;
   - caches compiled Rust dependencies, using a portable `x86-64-v3` target in CI, plus ccache C++ objects and the MKL download;
   - installs only `ccache` from apt.
+
+## [1.1.0] - 2026-11-27
+
+### Added
+- **Spine quantities of interest**, compared between configurations:
+  - range of motion (rotation of each rigid body);
+  - intradiscal pressure (mean hydrostatic pressure per nucleus);
+  - facet contact force (FEBio's total contact force per contact surface).
+- **Code:**
+  - `rust/bench/qoi.py` computes the quantities.
+  - `rust/bench/xplt.py` is a minimal reader for FEBio `.xplt` plot files, including compressed states.
+- **CI regression gate:** now fails when range of motion differs by more than 1e-9, or IDP or facet force by more than 1e-6, between PARDISO and the Rust solver. The spine surrogate writes `contact force` to its plot file for this.
+- **Finley benchmark driver:** records the quantities and compares them against the first configuration.
+- **`rust/BENCHMARKS.md`:** the quantities for all five Finley models are identical between native FEBio 4.13 and FEBio-Rust.
 
 ## [1.0.0] - 2026-11-27
 

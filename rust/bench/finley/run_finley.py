@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Benchmark the published Finley et al. (2018) lumbar spine models.
 
-Runs each model with several (executable, linear solver) configurations and records:
-wall time, FEBio's timing breakdown, iteration and reformation counts, and the final
-rotation of every rigid body (vertebral end plates). The rotation of the loaded body is
-the segment's range of motion.
+Runs each model with several (executable, linear solver) configurations and records
+wall time, FEBio's timing breakdown, iteration and reformation counts, and the spine
+quantities of interest (rust/bench/qoi.py): range of motion (rotation of every rigid
+body), intradiscal pressure per nucleus and facet contact force per contact surface.
+Configurations after the first are compared with the first on those quantities.
 
 The models are FEBio 2.5 files. They are unpacked from models/finley2018/*.zip and
 rewritten for FEBio 4 by convert_feb25.py: purely syntactic changes, identical for every
@@ -32,6 +33,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, HERE)
 from convert_feb25 import convert  # noqa: E402
+sys.path.insert(0, os.path.join(HERE, ".."))
+import qoi as Q  # noqa: E402
 
 ZIPS = sorted(glob.glob(os.path.join(ROOT, "models", "finley2018", "*.zip")))
 
@@ -129,6 +132,7 @@ def run(workdir, feb, cname, exe, solver, threads, rep):
                 resid=tsec(log, "evaluating residual"), update=tsec(log, "model update"),
                 quats={str(k): v for k, v in q.items()},
                 rot_deg={str(k): angle_deg(v) for k, v in q.items()},
+                qoi=Q.qoi(dst, os.path.join(d, stem + ".xplt"), log) if "N O R M A L" in log else None,
                 stderr=p.stderr[-2000:] if not log else "")
 
 
@@ -162,6 +166,11 @@ def main():
                 res.append(r)
                 json.dump(res, open(a.out, "w"), indent=1)
                 rot = ", ".join(f"{k}:{v:.4f}" for k, v in r["rot_deg"].items() if v > 1e-9)
+                ref = next((x for x in res if x["model"] == model and x["rep"] == rep and x["config"] == configs[0][0]), None)
+                if ref is not None and ref is not r and ref.get("qoi") and r.get("qoi"):
+                    r["qoi_diff_vs_" + configs[0][0]] = Q.compare(ref["qoi"], r["qoi"])
+                    json.dump(res, open(a.out, "w"), indent=1)
+                    rot += f" qoi_diff={r['qoi_diff_vs_' + configs[0][0]]}"
                 print(f"{model:18s} {name:14s} ok={r['ok']} wall={r['wall']:7.1f}s total={r['total']} "
                       f"lin={r['linsolve']} it={r['iters']} refs={r['refs']} rot[deg]={rot}", flush=True)
 

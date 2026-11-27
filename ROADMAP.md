@@ -9,7 +9,7 @@ Build an open-source nonlinear FE solver for spine biomechanics that is as fast 
 | | Target | Measured on |
 |---|---|---|
 | Speed | ≥ 5× faster end to end than upstream FEBio 4.13 + PARDISO | Finley et al. 2018 L4–L5 and L1–L5 models, 32+ cores |
-| Accuracy | Same iteration counts; displacements and range of motion within 1e-9 (relative) of upstream FEBio | same models |
+| Accuracy | Same iteration counts; displacements and range of motion within 1e-9, intradiscal pressure and facet contact forces within 1e-6 (relative) of upstream FEBio | same models |
 | Determinism | Byte-identical output for every run and every thread count | CI gate |
 | Build | One `cargo build`, no vendor libraries | Linux, macOS, Windows |
 | Use | Python API for scripting, parameter studies and calibration | — |
@@ -48,6 +48,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 2.5 | Python driver for the `febio4` executable (run, parse log and plot files) | ⬜ |
 | 2.6 | Rust LDLᵀ pivot threshold for stiff/soft mixed systems | ✅ |
 | 2.7 | Rust LU: refine only while it helps | ✅ |
+| 2.8 | Spine quantities of interest (range of motion, intradiscal pressure, facet contact force) in benchmarks and the CI gate | ✅ |
 
 ## Phase 3 — Remove remaining bottlenecks in the C++ host
 
