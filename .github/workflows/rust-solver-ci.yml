@@ -91,14 +91,22 @@ jobs:
                -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache $MKL_CMAKE_ARGS
       - name: Build
         run: cmake --build cmbuild -j $(nproc) && ccache -s
-      - name: Regression (PARDISO vs Rust)
+      - name: Regression (PARDISO vs Rust) and spine smoke test
         if: github.event_name != 'push'
+        # both on 2 threads, side by side on the 4-core runner
         run: |
+          python3 rust/bench/finley/ci_smoke.py --febio cmbuild/bin/febio4 --workdir "$RUNNER_TEMP/smoke" \
+            --threads 2 --md ci_smoke.md > ci_smoke.log 2>&1 & smoke=$!
           python3 rust/bench/ci_regression.py --febio cmbuild/bin/febio4 --workdir "$RUNNER_TEMP/runs" \
-            --threads 2 --tol 1e-9 --json ci_regression.json --md ci_regression.md
+            --threads 2 --tol 1e-9 --json ci_regression.json --md ci_regression.md; reg=$?
+          wait $smoke; sm=$?
+          cat ci_smoke.log
+          exit $(( reg || sm ))
       - name: Summary
         if: always() && github.event_name != 'push'
-        run: test -f ci_regression.md && cat ci_regression.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: |
+          test -f ci_regression.md && cat ci_regression.md >> "$GITHUB_STEP_SUMMARY" || true
+          test -f ci_smoke.md && cat ci_smoke.md >> "$GITHUB_STEP_SUMMARY" || true
       - uses: actions/upload-artifact@v4
         if: always() && github.event_name != 'push'
         with:
@@ -106,3 +114,4 @@ jobs:
           path: |
             ci_regression.json
             ci_regression.md
+            ci_smoke.md
