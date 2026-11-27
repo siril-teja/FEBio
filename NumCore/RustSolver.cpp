@@ -62,7 +62,7 @@ RustSolver::RustSolver(FEModel* fem) : LinearSolver(fem), m_pA(nullptr), m_symme
 	m_pivotEps = 0.0;
 	m_printLevel = 0;
 	m_reuseOrdering = true;
-	m_ompBlocktime = 0;
+	m_ompBlocktime = 5;
 }
 
 SparseMatrix* RustSolver::CreateSparseMatrix(Matrix_Type ntype)
@@ -103,8 +103,9 @@ bool RustSolver::PreProcess()
 	if (m_solver == nullptr)
 	{
 #if defined(__GNUC__)
-		// let idle OpenMP threads sleep right away instead of spinning while the
-		// Rust thread pool runs (-1 = leave the OpenMP runtime setting unchanged)
+		// let idle OpenMP threads sleep soon (5 ms) instead of spinning while the Rust
+		// thread pool runs; a few ms keep them awake between the back-to-back element
+		// loops of one assembly (-1 = leave the OpenMP runtime setting unchanged)
 		if ((m_ompBlocktime >= 0) && kmp_set_blocktime) kmp_set_blocktime(m_ompBlocktime);
 #endif
 		FrsSolver* s = frs_create(nthreads);

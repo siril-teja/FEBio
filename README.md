@@ -54,7 +54,7 @@ Solver options: `nthreads`, `ordering` (0 = METIS, 1 = AMD), `refine`, `pivot_ep
 | non-deterministic | `-nondeterministic` or `FEBIO_DETERMINISTIC=0` | as upstream FEBio; last-bit differences between runs |
 
 How the deterministic mode works:
-- **Element loops:** element matrices are computed in parallel and added to the global system in element order, so the result is exactly the serial one.
+- **Element loops:** elements are colored so that elements of one color share no node or rigid body. Each color is computed and assembled in parallel, the colors in a fixed order, so every global entry is summed in the same order for any thread count.
 - **Rust solver:** its arithmetic does not depend on thread scheduling.
 - **PARDISO:** runs in MKL's reproducible (CNR) mode.
 

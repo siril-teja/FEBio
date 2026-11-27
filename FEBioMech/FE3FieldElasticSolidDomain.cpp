@@ -138,9 +138,9 @@ void FE3FieldElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 
 	// repeat over all solid elements
 	int NE = (int)m_Elem.size();
-	// element matrices are computed in parallel and assembled in element order (deterministic)
+	// element matrices are computed in parallel and assembled color by color (deterministic, see FECoreThreads::ComputeAndAssembleColored)
 	struct Item { FEElementMatrix ke; };
-	FECoreThreads::ComputeThenAssembleInOrder<Item>(NE,
+	FECoreThreads::ComputeAndAssembleColored<Item>(AssemblyColoring(),
 		[&](int iel, Item& it) {
 			FESolidElement& el = m_Elem[iel];
 
@@ -175,7 +175,7 @@ void FE3FieldElasticSolidDomain::StiffnessMatrix(FELinearSystem& LS)
 		[&](int iel, Item& it) {
 			// assemble element matrix in global stiffness matrix
 			LS.Assemble(it.ke);
-		}, 256);
+		}, SerialAssembly());
 }
 
 //-----------------------------------------------------------------------------
