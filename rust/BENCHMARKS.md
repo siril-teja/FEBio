@@ -156,6 +156,7 @@ These are the subject-specific FEBio lumbar models of Finley et al. (2018, CMBBE
 |---|---:|---:|---:|---:|---:|---|---|
 | 59F L4–L5 hybrid | 49,971 | 126.3 s (lin. 87.6) | **120.3 s** (lin. 64.1) | 152.7 s | **1.05×** | 378 / 100, all three | 4.0433, all three |
 | 49F L4–L5 hex | 110,508 | 288.0 s (lin. 223.3) | **214.0 s** (lin. 134.6) | 342.4 s | **1.35×** | 368 / 100, all three | 4.0414, all three |
+| 49F L4–L5 hex, 1.4.0 (rerun) | 110,508 | 365 s (lin. 276) | **226 s** (lin. 154) | | **1.61×** | 368 / 100, identical | 4.0414, identical |
 | 49F L4–L5 hybrid | 112,764 | 67.8 s (lin. 50.2) | 73.9 s (lin. 46.3) | 83.1 s | 0.92× | 97 / 15, all three | 5.0045, all three |
 
 The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU refinement (#17); before 0.4.10 it took 101.4 s.
@@ -175,11 +176,12 @@ The 49F hybrid Rust row was measured with 0.4.10, which removed unnecessary LU r
 | model | equations | native | Rust | Rust vs native | iterations / reformations | rotation of the loaded vertebra (°) |
 |---|---:|---:|---:|---:|---|---|
 | 49F L1–L5 hex | 280,467 | 1042 s (lin. 802) | **971 s** (lin. 623) | **1.07×** | 958 / 101, identical | 18.2622, identical |
+| 49F L1–L5 hex, 1.4.0 (rerun) | 280,467 | 1405 s (lin. 1047) | **1148 s** (lin. 794) | **1.22×** | 958 / 101, identical | 18.2622, identical |
 | 59F L1–L5 hybrid | 170,478 | **703 s** (lin. 520) | 947 s (lin. 668) | 0.74× | 867 / 101, identical | 19.5712, identical |
 | 59F L1–L5 hybrid, 1.1.4 (rerun) | 170,478 | 981 s (lin. 709) | **937 s** (lin. 636) | **1.05×** | 867 / 101, identical | 19.5712, identical |
 | 59F L1–L5 hybrid, 1.1.8 (rerun) | 170,478 | 975 s (lin. 702) | **884 s** (lin. 642) | **1.10×** | 867 / 101, identical | 19.5712, identical |
 
-Raw data is in `rust/bench/results/finley_l15.json`; the 1.1.4 and 1.1.8 reruns are in `finley_l15_59_v114.json` and `finley_l15_59_v118.json`. The rerun ran both builds back to back on a VM that was about 40% slower than for the earlier rows, so compare within a row only. Its IDP and facet forces are identical too (see below). The final rigid-body quaternions agree to every printed digit.
+Raw data is in `rust/bench/results/finley_l15.json`; the 1.1.4 and 1.1.8 reruns are in `finley_l15_59_v114.json` and `finley_l15_59_v118.json`, the 49F 1.4.0 reruns in `finley_49_v140.json`. The rerun ran both builds back to back on a VM that was about 40% slower than for the earlier rows, so compare within a row only. Its IDP and facet forces are identical too (see below). The final rigid-body quaternions agree to every printed digit.
 
 - **49F hex (symmetric matrix):** the Rust LDLᵀ is 22% faster than PARDISO. Stiffness, residual and model update are 1.5–2× slower than native, which keeps the end-to-end gain at 7%.
 - **59F hybrid:** the model sets `symmetric_stiffness 0`, so it solves a non-symmetric system with LU. In this table (1.0.0) PARDISO's LU is faster: 101 factorizations of a matrix with 2.1·10⁸ nonzeros in L. Iterative refinement is not the cause: 4 refinement steps in 80 solves over the first 12 steps. ROADMAP 3.12 (1.1.2–1.1.3) has since made the Rust LU faster than PARDISO; see below.

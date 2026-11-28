@@ -1,0 +1,405 @@
+[
+ {
+  "model": "49F_L45_hex",
+  "config": "native",
+  "solver": "pardiso",
+  "threads": 4,
+  "rep": 0,
+  "wall": 366.9422700405121,
+  "rc": 0,
+  "ok": true,
+  "neq": 110508,
+  "iters": 368,
+  "refs": 100,
+  "rhs": 473,
+  "total": 364.535,
+  "linsolve": 275.546,
+  "reform": 21.4391,
+  "stiff": 21.7789,
+  "resid": 11.8728,
+  "update": 18.556,
+  "quats": {
+   "11": [
+    0.0352599695756,
+    -0.000148818544983,
+    0.000142561730348,
+    0.99937815269
+   ],
+   "14": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  },
+  "rot_deg": {
+   "11": 4.041401643656038,
+   "14": 0.0
+  },
+  "qoi": {
+   "rom_deg": {
+    "11": 4.041401643656038,
+    "14": 0.0
+   },
+   "idp": {
+    "L45NUCLEUS": -0.6875949397217482
+   },
+   "facet_force": {
+    "L45right_master": 0.4465846452251427,
+    "L45right_slave": 0.4465846452251427,
+    "L45left_master": 0.0,
+    "L45left_slave": 0.0
+   }
+  },
+  "stderr": "",
+  "reference_2017": {
+   "iters": 365,
+   "refs": 100,
+   "total": 528.0,
+   "linsolve": 296.0
+  }
+ },
+ {
+  "model": "49F_L45_hex",
+  "config": "rust",
+  "solver": "rust",
+  "threads": 4,
+  "rep": 0,
+  "wall": 226.17691445350647,
+  "rc": 0,
+  "ok": true,
+  "neq": 110508,
+  "iters": 368,
+  "refs": 100,
+  "rhs": 473,
+  "total": 226.045,
+  "linsolve": 154.003,
+  "reform": 5.34196,
+  "stiff": 21.7644,
+  "resid": 12.0582,
+  "update": 17.9898,
+  "quats": {
+   "11": [
+    0.0352599695756,
+    -0.000148818544981,
+    0.000142561730349,
+    0.99937815269
+   ],
+   "14": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ]
+  },
+  "rot_deg": {
+   "11": 4.041401643656038,
+   "14": 0.0
+  },
+  "qoi": {
+   "rom_deg": {
+    "11": 4.041401643656038,
+    "14": 0.0
+   },
+   "idp": {
+    "L45NUCLEUS": -0.6875949397217482
+   },
+   "facet_force": {
+    "L45right_master": 0.4465846452251427,
+    "L45right_slave": 0.4465846452251427,
+    "L45left_master": 0.0,
+    "L45left_slave": 0.0
+   }
+  },
+  "stderr": "",
+  "reference_2017": {
+   "model": "49F_L45_hex",
+   "config": "native",
+   "solver": "pardiso",
+   "threads": 4,
+   "rep": 0,
+   "wall": 366.9422700405121,
+   "rc": 0,
+   "ok": true,
+   "neq": 110508,
+   "iters": 368,
+   "refs": 100,
+   "rhs": 473,
+   "total": 364.535,
+   "linsolve": 275.546,
+   "reform": 21.4391,
+   "stiff": 21.7789,
+   "resid": 11.8728,
+   "update": 18.556,
+   "quats": {
+    "11": [
+     0.0352599695756,
+     -0.000148818544983,
+     0.000142561730348,
+     0.99937815269
+    ],
+    "14": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "rot_deg": {
+    "11": 4.041401643656038,
+    "14": 0.0
+   },
+   "qoi": {
+    "rom_deg": {
+     "11": 4.041401643656038,
+     "14": 0.0
+    },
+    "idp": {
+     "L45NUCLEUS": -0.6875949397217482
+    },
+    "facet_force": {
+     "L45right_master": 0.4465846452251427,
+     "L45right_slave": 0.4465846452251427,
+     "L45left_master": 0.0,
+     "L45left_slave": 0.0
+    }
+   },
+   "stderr": "",
+   "reference_2017": {
+    "iters": 365,
+    "refs": 100,
+    "total": 528.0,
+    "linsolve": 296.0
+   }
+  },
+  "qoi_diff_vs_native": {
+   "rom_deg": 0.0,
+   "idp": 0.0,
+   "facet_force": 0.0
+  }
+ },
+ {
+  "model": "49F_L15_hex",
+  "config": "native",
+  "solver": "pardiso",
+  "threads": 4,
+  "rep": 0,
+  "wall": 1405.5591433048248,
+  "rc": 0,
+  "ok": true,
+  "neq": 280467,
+  "iters": 958,
+  "refs": 101,
+  "rhs": 1239,
+  "total": 1405.3,
+  "linsolve": 1047.09,
+  "reform": 57.6033,
+  "stiff": 57.5444,
+  "resid": 68.0216,
+  "update": 124.668,
+  "quats": {
+   "16": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "121": [
+    0.158529700524,
+    0.000162661620183,
+    0.00722191951498,
+    0.987327783196
+   ]
+  },
+  "rot_deg": {
+   "16": 0.0,
+   "121": 18.262221887366408
+  },
+  "qoi": {
+   "rom_deg": {
+    "16": 0.0,
+    "121": 18.262221887366408
+   },
+   "idp": {
+    "L45NUCLEUS": 0.10596960385212147,
+    "L34NUCLEUS": 0.16643252604558256,
+    "L23NUCLEUS": 0.2141602148065397,
+    "L12NUCLEUS": 0.19616903418416912
+   },
+   "facet_force": {
+    "L12right_master": 1.626542828313652,
+    "L12right_slave": 1.626542828313652,
+    "L12left_master": 0.0,
+    "L12left_slave": 0.0,
+    "L23right_master": 0.28164067658037023,
+    "L23right_slave": 0.28164067658037023,
+    "L23left_master": 0.0,
+    "L23left_slave": 0.0,
+    "L34right_master": 0.8953499740387872,
+    "L34right_slave": 0.8953499740387872,
+    "L34left_master": 0.0,
+    "L34left_slave": 0.0,
+    "L45right_master": 0.0,
+    "L45right_slave": 0.0,
+    "L45left_master": 0.0,
+    "L45left_slave": 0.0
+   }
+  },
+  "stderr": "",
+  "reference_2017": {
+   "iters": 789,
+   "refs": 100,
+   "total": 1536.0,
+   "linsolve": 938.0
+  }
+ },
+ {
+  "model": "49F_L15_hex",
+  "config": "rust",
+  "solver": "rust",
+  "threads": 4,
+  "rep": 0,
+  "wall": 1147.9385499954224,
+  "rc": 0,
+  "ok": true,
+  "neq": 280467,
+  "iters": 958,
+  "refs": 101,
+  "rhs": 1239,
+  "total": 1147.7,
+  "linsolve": 793.652,
+  "reform": 22.3275,
+  "stiff": 57.9199,
+  "resid": 76.8999,
+  "update": 137.411,
+  "quats": {
+   "16": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "121": [
+    0.158529700524,
+    0.000162661620182,
+    0.00722191951498,
+    0.987327783196
+   ]
+  },
+  "rot_deg": {
+   "16": 0.0,
+   "121": 18.262221887366408
+  },
+  "qoi": {
+   "rom_deg": {
+    "16": 0.0,
+    "121": 18.262221887366408
+   },
+   "idp": {
+    "L45NUCLEUS": 0.10596960385212147,
+    "L34NUCLEUS": 0.16643252604558256,
+    "L23NUCLEUS": 0.2141602148065397,
+    "L12NUCLEUS": 0.19616903418416912
+   },
+   "facet_force": {
+    "L12right_master": 1.626542828313652,
+    "L12right_slave": 1.626542828313652,
+    "L12left_master": 0.0,
+    "L12left_slave": 0.0,
+    "L23right_master": 0.28164067658037023,
+    "L23right_slave": 0.28164067658037023,
+    "L23left_master": 0.0,
+    "L23left_slave": 0.0,
+    "L34right_master": 0.8953499740387872,
+    "L34right_slave": 0.8953499740387872,
+    "L34left_master": 0.0,
+    "L34left_slave": 0.0,
+    "L45right_master": 0.0,
+    "L45right_slave": 0.0,
+    "L45left_master": 0.0,
+    "L45left_slave": 0.0
+   }
+  },
+  "stderr": "",
+  "reference_2017": {
+   "model": "49F_L15_hex",
+   "config": "native",
+   "solver": "pardiso",
+   "threads": 4,
+   "rep": 0,
+   "wall": 1405.5591433048248,
+   "rc": 0,
+   "ok": true,
+   "neq": 280467,
+   "iters": 958,
+   "refs": 101,
+   "rhs": 1239,
+   "total": 1405.3,
+   "linsolve": 1047.09,
+   "reform": 57.6033,
+   "stiff": 57.5444,
+   "resid": 68.0216,
+   "update": 124.668,
+   "quats": {
+    "16": [
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    "121": [
+     0.158529700524,
+     0.000162661620183,
+     0.00722191951498,
+     0.987327783196
+    ]
+   },
+   "rot_deg": {
+    "16": 0.0,
+    "121": 18.262221887366408
+   },
+   "qoi": {
+    "rom_deg": {
+     "16": 0.0,
+     "121": 18.262221887366408
+    },
+    "idp": {
+     "L45NUCLEUS": 0.10596960385212147,
+     "L34NUCLEUS": 0.16643252604558256,
+     "L23NUCLEUS": 0.2141602148065397,
+     "L12NUCLEUS": 0.19616903418416912
+    },
+    "facet_force": {
+     "L12right_master": 1.626542828313652,
+     "L12right_slave": 1.626542828313652,
+     "L12left_master": 0.0,
+     "L12left_slave": 0.0,
+     "L23right_master": 0.28164067658037023,
+     "L23right_slave": 0.28164067658037023,
+     "L23left_master": 0.0,
+     "L23left_slave": 0.0,
+     "L34right_master": 0.8953499740387872,
+     "L34right_slave": 0.8953499740387872,
+     "L34left_master": 0.0,
+     "L34left_slave": 0.0,
+     "L45right_master": 0.0,
+     "L45right_slave": 0.0,
+     "L45left_master": 0.0,
+     "L45left_slave": 0.0
+    }
+   },
+   "stderr": "",
+   "reference_2017": {
+    "iters": 789,
+    "refs": 100,
+    "total": 1536.0,
+    "linsolve": 938.0
+   }
+  },
+  "qoi_diff_vs_native": {
+   "rom_deg": 0.0,
+   "idp": 0.0,
+   "facet_force": 0.0
+  }
+ }
+]
