@@ -12,6 +12,17 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.6.0] - 2026-11-28
+
+### Added
+- **Rust FE core: hex8, tet4 and tet10 elements** (ROADMAP 4.3), in `febio_core::element`.
+  - Shape functions and parametric derivatives in FEBio's node order.
+  - FEBio's default integration rules: hex8 2×2×2 Gauss, tet4 1 point, tet10 FEBio's 8-point rule.
+  - Kinematics: Jacobian, shape-function gradients, deformation gradient, volume.
+  - **Unit tests:** nodal interpolation, partition of unity, finite-difference derivatives, reference volumes, and an exact affine patch test on distorted elements, including curved tet10.
+  - **Check against C++ FEBio** (`rust/bench/core/jcheck.py`): each element's mean J is recomputed from FEBio's nodal displacements and compared with FEBio's plotted relative volume. Over 165,430 elements of 59F L4–L5 (hex8 + tet4), 49F L4–L5 (hex8) and 49F L1–L5 (tet10), the largest relative difference is 1.1e-7 at 2 steps and 2.5e-7 at 40 steps (J 0.97–1.07). The plot file is float32.
+  - CI runs this check for one step of 59F L4–L5 and 49F L1–L5 tet10, alongside the regression.
+
 ## [1.5.0] - 2026-11-28
 
 ### Added
