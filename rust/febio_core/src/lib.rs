@@ -4,6 +4,11 @@
 //! into a [`model::Model`]: nodes, element blocks, named node sets and surfaces,
 //! discrete (spring) sets and materials. Sections the core does not model yet are kept
 //! as generic [`model::Node`] trees.
+//!
+//! 4.3: [`element::ElementTraits`]: hex8, tet4 and tet10 shape functions, FEBio's default
+//! integration rules, and kinematics (Jacobian, shape-function gradients, deformation
+//! gradient).
+pub mod element;
 pub mod feb;
 pub mod model;
 
