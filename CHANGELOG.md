@@ -12,6 +12,13 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.7.1] - 2026-11-28
+
+### Documentation
+- **Benchmarks: Finley 49F reruns with 1.4.0**, native and Rust back to back at 4 threads, with range of motion, IDP and facet forces identical.
+  - L4–L5 hex: 226 s vs native 365 s (1.61×; 1.35× with 1.0.0).
+  - L1–L5 hex: 1148 s vs native 1405 s (1.22×; 1.07× with 1.0.0).
+
 ## [1.7.0] - 2026-11-28
 
 ### Added
