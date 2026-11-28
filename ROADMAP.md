@@ -77,7 +77,7 @@ Status: ✅ done · 🔄 in progress · ⬜ planned
 | 4.1 | Core: mesh, degrees of freedom, assembly, Newton/BFGS, time stepping | ⬜ |
 | 4.2 | `.feb` reader (2.5 / 4.0) | ✅ |
 | 4.3 | Elements: hex8, tet4, tet10 | ✅ |
-| 4.4 | Materials: neo-Hookean, orthotropic elastic | ⬜ |
+| 4.4 | Materials: neo-Hookean, orthotropic elastic | ✅ |
 | 4.5 | Materials: Holmes–Mow + fiber-exp-pow mixtures, local axes | ⬜ |
 | 4.6 | Rigid bodies, nonlinear springs, pressure loads | ⬜ |
 | 4.7 | Sliding-elastic contact | ⬜ |

@@ -12,6 +12,19 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.7.0] - 2026-11-28
+
+### Added
+- **Rust FE core: neo-Hookean and orthotropic elastic materials** (ROADMAP 4.4), in `febio_core::material`.
+  - Cauchy stress and spatial elasticity tensor, with FEBio's formulations and Lamé-parameter evaluation for the orthotropic law.
+  - `from_model` builds a material from a `.feb` definition.
+  - Orthotropic material axes (`mat_axis`) are not supported yet; the Finley cortical shells use the global axes.
+  - **Unit tests:** stress-free reference state; the small-strain limit (isotropic Lamé law and the orthotropic compliance with engineering constants); and the tangent against a finite-difference Truesdell rate of the Kirchhoff stress, agreeing to 1e-6.
+- **FEBio check uses 12-digit log data** (`rust/bench/core/jcheck.py`). It now reads nodal displacements and element J and stress from FEBio log data records (12 significant digits) instead of the float32 plot file, and also compares the element stress.
+  - On 59F L4–L5, 49F L4–L5 and 49F L1–L5 tet10 (165,430 elements; 150,213 with these two materials), at 2 and 40 steps:
+    - J agrees to 1.4e-11;
+    - stress agrees to 3.2e-6 relative on elements above 1% of the peak stress, and to 9e-8 of the peak stress everywhere.
+
 ## [1.6.0] - 2026-11-28
 
 ### Added
