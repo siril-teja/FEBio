@@ -8,8 +8,12 @@
 //! 4.3: [`element::ElementTraits`]: hex8, tet4 and tet10 shape functions, FEBio's default
 //! integration rules, and kinematics (Jacobian, shape-function gradients, deformation
 //! gradient).
+//!
+//! 4.4: [`material`]: neo-Hookean and orthotropic elastic (Cauchy stress and spatial
+//! elasticity tensor), FEBio's formulations.
 pub mod element;
 pub mod feb;
+pub mod material;
 pub mod model;
 
 pub use feb::{read_file, read_str, Error};
