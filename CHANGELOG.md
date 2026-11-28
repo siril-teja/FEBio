@@ -12,6 +12,17 @@ Every pull request into `main` bumps `VERSION` according to its [conventional-co
 
 The FEBio version this fork is based on (`FEBioLib/version.h`, currently 4.13.0) is upstream's and is not changed here.
 
+## [1.5.0] - 2026-11-28
+
+### Added
+- **Rust FE core, first item: `.feb` reader** (ROADMAP 4.2). New crate `rust/febio_core` reads `febio_spec` 2.5 and 4.0 files into a `Model`.
+  - Typed data: nodes, element blocks (type, part, material), node sets, surfaces, discrete (spring) sets, and solid and discrete materials with their parameter trees.
+  - Material assignment comes from 2.5 `mat` ids or 4.0 `MeshDomains`.
+  - All other sections (Control, Boundary, Loads, Contact, Rigid, Step, Output) are kept as generic trees for the next Phase 4 items.
+  - ISO-8859-1 files are read correctly.
+  - On all 12 Finley et al. (2018) models with an FEBio log, node, solid-element and material counts match the log. The 17 MB 59F L1–L5 file reads in 0.3 s.
+  - CI checks the crate (fmt, clippy, tests including every Finley model).
+
 ## [1.4.0] - 2026-11-27
 
 ### Added
