@@ -79,6 +79,7 @@ How the deterministic mode works:
 | Path | Contents |
 |---|---|
 | `rust/febio_rs_solver/` | Rust solver crate (C ABI, tests) |
+| `rust/febio_core/` | Rust FE core (Phase 4): `.feb` reader so far |
 | `NumCore/RustSolver.*` | FEBio wrapper for the Rust solver |
 | `python/febio_rs/` | Python driver: run `febio4`, read log and plot files, spine QoIs ([python/README.md](python/README.md)) |
 | `rust/bench/` | benchmark models, regression and benchmark scripts |

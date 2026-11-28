@@ -1,0 +1,10 @@
+[package]
+name = "febio_core"
+version = "0.1.0"
+edition = "2021"
+description = "FEBio-Rust FE core (ROADMAP Phase 4): model input and data structures"
+license = "MIT"
+publish = false
+
+[dependencies]
+roxmltree = "0.20"

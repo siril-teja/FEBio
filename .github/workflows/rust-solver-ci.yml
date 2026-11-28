@@ -41,6 +41,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/febio_rs_solver/target
+            rust/febio_core/target
           key: cargo-v3-crate-${{ github.sha }}
           restore-keys: cargo-v3-crate-
       - name: Format
@@ -55,6 +56,14 @@ jobs:
       - name: Build tests (cache warm-up on main)
         if: github.event_name == 'push'
         run: cargo test --release --no-run
+      - name: FE core crate (fmt, clippy, tests incl. all Finley models)
+        if: github.event_name != 'push'
+        working-directory: rust/febio_core
+        run: |
+          python3 -c "import sys; sys.path.insert(0, '../bench/finley'); import run_finley as F; F.unpack('$RUNNER_TEMP/finley')"
+          cargo fmt --check
+          cargo clippy --release --all-targets -- -D clippy::correctness -D clippy::suspicious
+          FINLEY_FEB_DIR="$RUNNER_TEMP/finley/src" cargo test --release
 
   febio:
     name: FEBio build + PARDISO-vs-Rust regression
