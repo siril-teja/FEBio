@@ -38,15 +38,27 @@ fn main() {
         })
         .collect();
     let nd = i64_(&mut o) as usize;
-    let solid: Vec<_> = m.blocks.iter().filter(|b| b.kind.is_solid()).collect();
-    assert_eq!(nd, solid.len(), "domain count");
-    let (mut worst, mut count, mut jmin, mut jmax) = (0.0f64, 0usize, f64::MAX, f64::MIN);
-    for b in solid {
+    // plot-file domains (element ids and mean J), matched to element blocks by element ids
+    let mut doms: std::collections::HashMap<Vec<i64>, Vec<f64>> = Default::default();
+    for _ in 0..nd {
         let ne = i64_(&mut o) as usize;
-        assert_eq!(ne, b.len(), "elements in domain");
         let ids: Vec<i64> = (0..ne).map(|_| i64_(&mut o)).collect();
-        assert_eq!(ids, b.ids, "element ids");
-        let jref = f64s(&mut o, ne);
+        let nj = i64_(&mut o) as usize;
+        let j = f64s(&mut o, nj);
+        if nj == ne {
+            doms.insert(ids, j);
+        }
+    }
+    let (mut worst, mut count, mut jmin, mut jmax) = (0.0f64, 0usize, f64::MAX, f64::MIN);
+    let mut skipped = 0usize;
+    for b in &m.blocks {
+        if !b.kind.is_solid() {
+            skipped += b.len();
+            continue;
+        }
+        let jref = doms
+            .get(&b.ids)
+            .unwrap_or_else(|| panic!("no plot domain with the elements of block {:?}", b.name));
         let tr = ElementTraits::new(&b.kind);
         for (e, &jr) in jref.iter().enumerate() {
             let conn = b.element(e);
@@ -63,5 +75,5 @@ fn main() {
             count += 1;
         }
     }
-    println!("{count} elements, J in [{jmin:.6}, {jmax:.6}], max rel diff {worst:.3e}");
+    println!("{count} solid elements ({skipped} shell elements skipped), J in [{jmin:.6}, {jmax:.6}], max rel diff {worst:.3e}");
 }

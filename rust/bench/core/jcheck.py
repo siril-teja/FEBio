@@ -57,9 +57,10 @@ def main():
             f.write(struct.pack(f"<{len(d)}d", *d))
             f.write(struct.pack("<q", len(p.domains)))
             for k, dom in enumerate(p.domains):
-                j = rv.get(k, [])
+                j = rv.get(k + 1) or []   # plot regions are numbered from 1
                 f.write(struct.pack("<q", len(dom["elems"])))
                 f.write(struct.pack(f"<{len(dom['elems'])}q", *dom["elems"]))
+                f.write(struct.pack("<q", len(j)))
                 f.write(struct.pack(f"<{len(j)}d", *j))
         out = subprocess.run([exe, os.path.join(a.workdir, stem + ".feb"), dump], capture_output=True, text=True)
         print(f"{model}: {out.stdout.strip()} {out.stderr.strip()[-300:]}")
